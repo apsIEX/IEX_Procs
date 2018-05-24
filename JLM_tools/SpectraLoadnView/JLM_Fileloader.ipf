@@ -20,6 +20,7 @@
 
 Menu "Data"
 		"IEX LoaderPanel", Loader_Panel()
+		//IEX_Menus.ipf in Igor Procedures set the "APS Procs" menu
 End
 
 Macro Loader_Panel()
@@ -35,10 +36,10 @@ function LoaderPanelVariables()
 	string dfn="LoaderPanel", df="root:"+dfn+":"
 	NewDataFolder/o/s root:LoaderPanel
 	string/g filepath, filename, filelist, nfile, folderList, LPext,  datatype, datatypelist,wvdf, loadedwvlist
-	variable/g filenum
+	variable/g filenum,checkBE_KE
 	svar filepath=$(df+"filepath"), filename=$(df+"filename"), filelist=$(df+"filelist"), nfile=$(df+"nfile"), folderList=$(df+"folderList")
 	svar datatypelist=$(df+"datatypelist"), datatype=$(df+"datatype"), wvdf=$(df+"wvdf"), loadedwvlist=$(df+"loadedwvlist")
-	nvar filenum=$(df+"filenum")
+	nvar filenum=$(df+"filenum"), checkBE_KE=$(df+"checkBE_KE")
 	make/o/w/u $(df+"filecolors")
 	wave  filecolors= $(df+"filecolors") 
 	filecolors={{0,0,0},{0,0,0},{0,0,65535},{65535,0,0}}
@@ -93,6 +94,8 @@ Function LoaderPanelSetup()
 	Button PLHelp pos={350,10 }, size={20,20}, title="?", proc=JLM_LoaderPanelHelp
 
 	//Variables
+	CheckBox checkbox_KE_BE, title="BE", pos={342,75},size={30,15},variable=root:LoaderPanel:checkBE_KE,disable=1
+	CheckBox checkbox_KE_BE, help={"Check for scaling data to be in binding energy"}
 end
 
 Function LoaderSelectFilter(ctrlName,varNum,varStr,varName) : SetVariableControl
@@ -209,48 +212,56 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton  title="Load All",  disable=0
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
 		break	
 		case "General Text":
 			LPext="*.txt"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton  title="Load All",  disable=1
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
 		break
 		case "Spec":
 			LPext="*.*"
 			Button LoadButton title="Load Single Scan",  disable=0
 			Button LoadAllButton  title="Load Experiment",  disable=0
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
 		break
 		case "MDAascii":
 			LPext="*.asc"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
 		break	
 		case "MDA":
 			LPext="*.mda"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
 		break
 		case "Tiff":
 			LPext="*.tif"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =0
+			CheckBox checkbox_KE_BE, disable=1
 		break
 		case "NetCDF":
 			LPext="*.nc"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=0
 		break
 		case "MPA":
 			LPext="*.mpa"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
 		break
 	endswitch
 	LoaderUpdateFilesLB(ctrlName)
@@ -1249,6 +1260,22 @@ Function MDAToolsHelp()
 		Notebook MDAToolsInfo, fstyle=0, text=txt
 	endif
 end
+
+Menu "APS Procs"
+	Submenu "IEX"
+		Submenu "Wave note tools"	
+			Submenu "MDA Tools"
+				"MDA Extra PVs -- list all", ExtraPVnotebook()
+				"MDA keyword search", print "ExtraPVstrList(\"pv\")"
+				"MDA Extra PV val", print "ExtraPVva(\"pv\")"
+				"MDA Extra PV to wave", ExtraPV2waveDialog()
+				"MDA Summarize all loaded folders",MDA_MakeSummary()
+				"MDA Tools Help", MDAToolsHelp()
+			end
+		end
+	end
+end
+
 Function ExtraPVnotebook()
 	DFREF dfr = GetDataFolderDFR()
 	wave wv=$GetIndexedObjNameDFR(dfr, 1, 0)
@@ -1390,18 +1417,7 @@ Function MDA_MakeSummary()
 end	
 
 
-Menu "APS Procs"
-	Submenu "IEX"
-		Submenu "MDA Tools"
-			"MDA Tools Help", MDAToolsHelp()
-			"MDA Extra PVs -- list all", ExtraPVnotebook()
-			"MDA keyword search", print "ExtraPVstrList(\"pv\")"
-			"MDA Extra PV val", print "ExtraPVva(\"pv\")"
-			"MDA Extra PV to wave", ExtraPV2waveDialog()
-			"MDA Summarize all loaded folders",MDA_MakeSummary()
-		end
-	end
-end
+
 //////////////////////////////////Load Tif///////////////////////////////////
 Function/s LoadImage_tiff(df)
 	string df
@@ -1596,8 +1612,16 @@ Function/s LoadNetCDF(df)
 	killdatafolder $(df+"nc_load")
 	NetCDFmetadata()
 	NetCDF_SESscaling()
-	wave wv=$(filename[0,strlen(filename)-4])
-	 NetCDF_SES_CropImage(wv)
+	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4]+"avgy",filename[0,strlen(filename)-4])
+//	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4],filename[0,strlen(filename)-3])
+//	wvname=SelectString(wavedims())
+	wave wv=$wvname
+	NetCDF_SES_CropImage(wv)
+	nvar checkBE_KE=$(df+"checkBE_KE")
+	if (checkBE_KE==1)
+		variable wk=4.8
+		IEX_SetEnergyScale(wvname,0,wavedims(wv)-1,wk)
+	endif
 	//return filename[0,strlen(filename)-4]
 End
 Function NetCDFmetadata()
@@ -1698,35 +1722,47 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	JLM_FileLoaderModule#killallinfolder(dfn)
 	killdatafolder dfn
 end
+
+Menu "APS Procs"
+	Submenu "IEX"
+		Submenu "ARPES - Analysis Tools"		
+			"KE_BE Scaling", IEX_SetEnergyScale_Dialog()
+			"Angle Scaling", IEX_SetAngleScale_Dialog()
+		end
+	end
+end
+
 Function IEX_SetEnergyScale_Dialog()
 	string wvname,Emodestr,Edimstr="y"
-	Prompt wvname, "Wave:",popup, WaveList("*",";","")
+	variable Wk=4.8
+	Prompt wvname, "Wave:",popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")
 	Prompt Emodestr, "Energy Scale", popup, "Binding Energy; Kinetic Energy"
 	Prompt Edimstr, "Energy Dimension:", popup, "x;y;z;t"
-	DoPrompt "Set netCDF SES Energy Scale"wvname,Emodestr,Edimstr
+	Prompt Wk, "Work Function"
+	DoPrompt "Set netCDF SES Energy Scale"wvname,Emodestr,Edimstr,WK
 	variable Emode,Edim
 	Emode=SelectNumber(cmpstr(Emodestr,"Binding Energy"),0,1)
 	Edim=SelectNumber(cmpstr(Edimstr,"t"),3,1+cmpstr(Edimstr,"y")) //dim from  popup list
 	if (v_flag==0)
-		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+")"
-		
+		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+","+num2str(Wk)+")"	
+		IEX_SetEnergyScale(wvname,Emode,Edim,Wk)
 	endif
-
 end
-Function IEX_SetEnergyScale(wvname,Emode,Edim)
+Function IEX_SetEnergyScale(wvname,Emode,Edim, Wk)
 	string wvname
 	variable Emode	// BE=0,KE=1
-	variable Edim
+	variable Edim, Wk
 	string  keysep=":",listsep=";"
 	variable hvphi=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_ActualPhotonEnergy",keysep,listsep) 
-	hvphi-=4.8//photon energy plus the work function
+	hvphi-=wk//photon energy plus the work function
 	variable LowEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_LowEnergy_RBV",keysep,listsep) 
 	variable HighEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_HighEnergy_RBV",keysep,listsep) 	
 	variable CentreEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_CentreEnergy_RBV",keysep,listsep) 
-	variable EnergyStep=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_EnergyStep_Swept_RBV",keysep,listsep)
+	variable EnergyStep=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_EnergyStep_RBV",keysep,listsep)
 	variable EnergyStep_Swept=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_EnergyStep_Swept_RBV",keysep,listsep) 
-	variable Estart=SelectNumber(Emode,LowEnergy-hvphi,LowEnergy)
+	variable AcqMode=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_AcquisitionMode_RBV",keysep,listsep) // Swept=0; Fixed=1
 	variable Edelta=SelectNumber(numtype(EnergyStep),EnergyStep,EnergyStep_Swept) //temporarilty had renamed the attribute make back compatible
+	variable Estart=SelectNumber(AcqMode,SelectNumber(Emode,LowEnergy-hvphi,LowEnergy), SelectNumber(Emode,CentreEnergy-(dimsize($wvname,Edim)/2)*Edelta-hvphi,CentreEnergy-(dimsize($wvname,Edim)/2)*Edelta))
 	string Eunits=SelectString(Emode,"Binding Energy (eV)", "Kinetic Energy (eV)")
 	variable i
 	Switch (Edim)
@@ -1744,8 +1780,43 @@ Function IEX_SetEnergyScale(wvname,Emode,Edim)
 			break
 		Endswitch
 end
-
-
+Function IEX_SetAngleScale_Dialog()
+	string wvname,Aunits,Adimstr="x"
+	variable A0
+	Prompt wvname, "Wave:",popup,"; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")
+	Prompt Adimstr, "Angle Dimension:", popup, "x;y;z;t"
+	Prompt A0, "Angle zero:"
+	Prompt Aunits, "Units"
+	DoPrompt "Set Angular Scale"wvname,Adimstr,A0,Aunits
+	variable Adim
+	Adim=SelectNumber(cmpstr(Adimstr,"t"),3,1+cmpstr(Adimstr,"y")) //dim from  popup list
+	if (v_flag==0)
+		print "IEX_SetAngleScale(\""+wvname+"\","+num2str(Adim)+",\""+Aunits+"\","+num2str(A0)+")"	
+		IEX_SetAngleScale(wvname,Adim,Aunits,A0)
+	endif
+end
+Function IEX_SetAngleScale(wvname,Adim,Aunits,A0)
+	string wvname,Aunits
+	variable Adim,A0
+	string  keysep=":",listsep=";"
+	variable Astep=dimdelta($wvname,Adim)
+	variable Aoffset=dimoffset($wvname,Adim)	
+	Switch (Adim)
+		case 0:
+			SetScale/p x, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			break
+		case 1:
+			SetScale/p y, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			break
+		case 2:
+			SetScale/p z, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			break
+		case 3:
+			SetScale/p t, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			break
+		Endswitch	
+	print "dimoffset("+wvname+","+num2str(Adim)+")  "+num2str(Aoffset)+"  =>  "+num2str(Aoffset+A0) 	
+End
 
 //Dither Procedures
 Function LoaderPanel_DitherDialogButton(ba) : ButtonControl
@@ -1854,6 +1925,19 @@ Function NetCDF_SES_CropImage(wv)
 	endif
 end
 
+Menu "APS Procs"
+	Submenu "IEX"
+		Submenu "Wave note tools"	
+			Submenu "NetCDF Tools"
+				"nc Attributes panel",ncKey_Panel()
+				"nc Attributes -- list all", WavenoteNotebook_Dialog()
+				"nc Attribute keyword search", ncNoteSearch_Dialog()	
+				"nc Attributes to wave", ncNote2waveDialog()	
+			end
+		end
+	end
+end
+
 Function ncNoteSearch_Dialog()
 	string wvname, key, keysep,listsep
 	keysep=":"
@@ -1876,7 +1960,7 @@ Function ncNote2wave(pv, destwv_name, basename,suffix,scanname_wvname)
 		variable scannum=scanname_wv[i]
 		string wvn=JLM_FileLoaderModule#WaveNamewithNum(basename,scannum,suffix)
 		if(WaveExists($wvn)!=1)
-			print "check that current data folder"
+			print "check the current data folder"
 		endif
 
 		variable val=WavenoteKeyVal(wvn,pv,keysep,listsep)
@@ -1886,7 +1970,8 @@ end
 
 Function ncNote2waveDialog()
 	string pv,basename,suffix, destwv_name,scanname_wvname
-	Prompt pv, "Attribute" 
+	string AttrList=ncPanel_AttributeList($(stringfromlist(0,WaveList("*",";",""))))
+	Prompt pv, "Attribute",popup AttrList 
 	Prompt basename, "Wave name prefix"
 	Prompt suffix, "Wave name suffix"
 	Prompt scanname_wvname, "Wave with scan numbers",popup, WaveList("*",";","")
@@ -2048,18 +2133,6 @@ Function ncKeyPanel_Hook(H_Struct)
 	endif
 end
 
-end
-
-
-Menu "APS Procs"
-	Submenu "IEX"
-		Submenu "NetCDF Tools"
-			"nc Attributes panel",ncKey_Panel()
-			"nc Attributes -- list all", WavenoteNotebook_Dialog()
-			"nc Attribute keyword search", ncNoteSearch_Dialog()	
-			"nc Attributes to wave", ncNote2waveDialog()	
-		end
-	end
 end
 
 

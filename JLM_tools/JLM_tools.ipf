@@ -156,17 +156,20 @@ end
 //////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////  	Remove Mesh via FFT	////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
-Function/wave RemoveSESmesh_2D(slice,r0)
-	wave slice
+Function/wave RemoveSESmesh_fft(wv,r0)
+	wave wv
 	variable r0
+	duplicate/o wv slice
+	setscale/p x 0,1,"pixels", slice
+	setscale/p y 0,1,"pixels", slice	
+	Redimension/s/N=(480,-1) slice//rowsize needs to be even
 	fft/dest=flt slice
 	wave/c flt
 	flt*=cmplx(1*(exp(-(x^2+y^2)/r0)),0)
 	ifft flt
 	return flt
 end
-
-Function RemoveSESmesh_3D(wv,r0) 
+Function RemoveSESmesh(wv,r0) 
 	wave wv
 	variable r0
 	//getscaling info
@@ -178,12 +181,20 @@ Function RemoveSESmesh_3D(wv,r0)
 	setscale/p y,0,1,"py", slice
 	duplicate/o slice slice_f
 	variable i
-	For(i=0;i<dimsize(wv,2);i+=1)
-		slice[][]=wv[p][q][i]
-		wave slice_f=RemoveSESmesh_2D(slice,r0)
-		wv_f[][][i]=slice_f[p][q]
-	endfor
+	if (wavedims(wv)==2)
+		wave slice_f=RemoveSESmesh_fft(slice,r0)
+		wv_f[][]=slice_f[p][q]
+	elseif(wavedims(wv)==2)
+		For(i=0;i<dimsize(wv,2);i+=1)
+			slice[][]=wv[p][q][i]
+			wave slice_f=RemoveSESmesh_fft(slice,r0)
+			wv_f[][][i]=slice_f[p][q]
+		endfor
+	else 
+		print "Only works for 2 or 3 dimensional waves"
+	endif
 end
+
 
 Function RemoveSESmesh_Dialog()
 	string wvname
@@ -191,8 +202,11 @@ Function RemoveSESmesh_Dialog()
 	Prompt wvname, "Select wave to FFT:", popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")
 	Prompt r0, "radius of filter:"
 	DoPrompt "Remove SES mesh via FFT", wvname, r0
-	wave wv=$wvname
-	RemoveSESmesh_3D(wv,r0) 
+	if (v_flag==0)	
+		wave wv=$wvname	
+		Print "RemoveSESmesh("+wvname+","+num2str(r0)+")" 
+		RemoveSESmesh(wv,r0) 
+	endif
 end	
 	
 /////////////////////////////////////////////////////////////////////////
@@ -295,3 +309,60 @@ Function ImAvgY_dialog()
 	ImgAvg(wv,opt)
 end
 
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////// Transpose Wave Axes //////////////////////////	
+/////////////////////////////////////////////////////////////////////////
+
+Function TransposeWaveAxes_Dialog()
+	string wvname, Axes_i, Axes_f
+	Prompt wvname, "Wave:", popup, Wavelist("!*_CT",";","DIMS:2")+Wavelist("!*_CT",";","DIMS:3")
+	Prompt Axes_i, "Initial axis order:", popup, "Degree/Energy/Rotation; Energy/Angle/Rotation"
+	Prompt Axes_f, "Initial axis order:", popup, "Energy/Degree/Rotation;Angle/Energy/Rotation"
+	DoPrompt "", wvname
+	if (v_flag==0)
+		wave wv=$wvname
+		if((wavedims(wv)==2) & (stringmatch(Axes_i,Axes_f)==0)) //2d and change order of axes
+			MatrixTranspose wv
+		endif
+		if(wavedims(wv)==3& (stringmatch(Axes_i,Axes_f)==0))
+		MatrixOp/o wv=TransposeVol(wv,5)
+		endif
+	endif
+end
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////// Print  Wave Axes Units //////////////////////////	
+/////////////////////////////////////////////////////////////////////////
+
+Function  PrintWaveUnits_Dialog()
+	string wvname
+	Prompt wvname, "Wave:", popup, Wavelist("!*_CT",";","DIMS:4")+Wavelist("!*_CT",";","DIMS:3")+Wavelist("!*_CT",";","DIMS:2")
+	DoPrompt "", wvname
+	if(v_flag==0)
+		PrintWaveUnits(wvname)
+	endif
+End
+
+Function PrintWaveUnits(wvname)
+	string wvname
+	wave wv=$wvname
+	variable i
+	string txt=""
+	For(i=0;i<wavedims(wv);i+=1)
+		txt+= waveunits(wv,i)+" / "
+	endfor
+	txt=txt[0,strlen(txt)-4]
+	print txt
+end
+
+Function Print_nc_hv(wvname)
+	string wvname
+	string  keysep=":",listsep=";"
+	print JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_ActualPhotonEnergy",keysep,listsep) 
+end
+
+Function Print_nc_hv_Top()
+	wave wv=ImageNameToWaveRef("",stringfromlist(0,ImageNameList("",";")))
+	string wvname=nameofwave(wv)
+	Print_nc_hv(wvname)
+end

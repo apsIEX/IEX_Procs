@@ -13,11 +13,14 @@
 
 Menu "APS Procs"
 	Submenu "IEX"
-		Submenu "MDA Tools"
-			"Print IEX Extra PVs", IEX_ExtraPV_Dialog()
+		Submenu "Wave note tools"	
+			Submenu "MDA Tools"
+				"Print IEX Extra PVs", IEX_ExtraPV_Dialog()
+			end	
 		end
-		Submenu "Analysis Tools"	
+		Submenu "ARPES - Analysis Tools"	
 			"XAS_ARPES - normalize by diode ", XAS_diode_Dialog()
+			"kplot - IEX data", IEX_kplot_dialog() 
 		end
 	End
 End
@@ -192,4 +195,29 @@ Function XAS_RSXS()
 	TFY_norm=TFY_norm/mesh //photons
 
 end
-	 
+Menu "kspace"	
+			"kplot - IEX data", IEX_kplot_dialog() 
+	end
+end	 
+ Function IEX_kplot_dialog()
+	string wvname
+	Variable Wk=4.8
+	Prompt wvname, "Wave:", popup, wavelist("*",";","DIMS:3")
+	Prompt Wk, "Work Function:"
+	DoPrompt "Kplot with IEX data", wvname, wk
+	if(v_flag==0)
+		print "IEX_kplot(\""+wvname+"\","+num2str(Wk)+")"
+		IEX_kplot(wvname,Wk)
+	endif
+end
+Function IEX_kplot(wvname,Wk)
+	string wvname
+	Variable Wk
+	//Set the Energy Scale to Binding Energy
+	IEX_SetEnergyScale(wvname,0,1,Wk)
+	string  keysep=":",listsep=";"
+	variable hv=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_ActualPhotonEnergy",keysep,listsep) 
+	variable hvphi=hv-Wk	//photon energy minus the work function
+	Execute "kplot(\""+wvname+"\",\"TwoPolar\",\"Already Done\",\"\",\"\")"
+	print "kplot_hv = Photon Energy - Work Function = "+num2str(hvphi)	
+end
