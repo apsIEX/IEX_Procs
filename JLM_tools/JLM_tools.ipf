@@ -153,6 +153,47 @@ Function hv_kzn(n,th,c,V0)
 	hv=((n*2*pi/c/0.5124)^2-V0)/cosd(th)
 	return hv
 end
+
+
+Function Calc_V0(KE2,th2,chi2,KE1,th1,chi1,a,m,n)
+	variable m,KE2,th2,chi2,n,KE1,th1,chi1,a
+	variable astar=2*pi/a
+	th2=th2/180*pi
+	chi2=chi2/180*pi
+	th1=th1/180*pi
+	chi1=chi1/180*pi
+	variable V0
+	variable c=0.5124
+	V0=0.5*(astar/c)^2*(m^2+n^2)-0.5*(KE2*cos(th2)^2*cos(chi2)^2+KE1*cos(th1)^2*cos(chi1)^2)
+	return V0
+End
+
+Function Calc_kz_n(KE2,th2,chi2,KE1,th1,chi1,a)	//assumes at kz2=(n+1)*astar; kz2=n*astar
+	variable KE2,th2,chi2,KE1,th1,chi1,a
+	variable astar=2*pi/a
+	th2=th2/180*pi
+	chi2=chi2/180*pi
+	th1=th1/180*pi
+	chi1=chi1/180*pi
+	variable n
+	variable c=0.5124
+//	print KE2*cos(th2)^2*cos(chi2)^2
+//	print KE1*cos(th1)^2*cos(chi1)^2
+//	print 0.5*(c/astar)^2
+	n=0.5*(c/astar)^2*abs(KE2*cos(th2)^2*cos(chi2)^2-KE1*cos(th1)^2*cos(chi1)^2)-1/2
+	print "n="+num2str(n)
+	return n
+End
+
+Function Calc_kz(KE,th,chi,V0)
+	variable KE,th,chi,V0
+	th=th/180*pi
+	chi=chi/180*pi
+	variable  c=0.5124
+	variable kz=sqrt(c^2*KE*cos(th)^2*cos(chi)^2+c^2*V0)
+	print "kz="+num2str(kz)
+	return kz
+end
 //////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////  	Remove Mesh via FFT	////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -184,7 +225,7 @@ Function RemoveSESmesh(wv,r0)
 	if (wavedims(wv)==2)
 		wave slice_f=RemoveSESmesh_fft(slice,r0)
 		wv_f[][]=slice_f[p][q]
-	elseif(wavedims(wv)==2)
+	elseif(wavedims(wv)==3)
 		For(i=0;i<dimsize(wv,2);i+=1)
 			slice[][]=wv[p][q][i]
 			wave slice_f=RemoveSESmesh_fft(slice,r0)
