@@ -1925,7 +1925,7 @@ end
 Function IEX_SetEnergyScale_Dialog()
 	string wvname,Emodestr,Edimstr="y"
 	variable Wk=4.8
-	Prompt wvname, "Wave:",popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")
+	Prompt wvname, "Wave:",popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:1")
 	Prompt Emodestr, "Energy Scale", popup, "Binding Energy; Kinetic Energy"
 	Prompt Edimstr, "Energy Dimension:", popup, "x;y;z;t"
 	Prompt Wk, "Work Function"
