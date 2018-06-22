@@ -831,7 +831,7 @@ Function/S MDAmkascii(SpectraLoadNViewpath)
 			ascii=parsefilepath(5,SpecialDirPath("Igor Pro User Files", 0, 0, 0)+SpectraLoadNViewpath,"/",0,0)+"mda_tmp"
 			ascii=replacestring(" ", ascii, "\\\ ")
 			sprintf cmd, "do shell script \" mkdir -p %s\"", ascii
-			print cmd
+//			print cmd
 		Break
 		EndSwitch
 		ExecuteScriptText cmd
@@ -1305,6 +1305,15 @@ Function/s ExtraPVstrList(key)
 	string tmp=listmatch(buffer,"*"+key+"*")
 	return tmp
 end
+Function/s ExtraPVstr(df,key)
+	string df,key
+	wave wv=$(df+GetIndexedObjName(df, 1, 0))	
+	string buffer=note(wv)
+	string tmp=listmatch(buffer,"*"+key+"*")
+	string valstr=stringfromlist(2,tmp,",")
+ 	valstr=valstr[2,strlen(valstr)-2]
+	return valstr
+end
 Function ExtraPVval(pv)
 	string pv
 	string extrapv=ExtraPVstrList(pv)
@@ -1343,7 +1352,6 @@ Function ExtraPV2waveDialog()
 		print "ExtraPVs2wave(\""+pv+"\",\""+GetWavesDataFolder(dest_wv,2)+"\",\""+basename+"\",\""+suffix+"\",\""+GetWavesDataFolder(scannum_wv,2)+"\")"
 		ExtraPVs2wave(pv, GetWavesDataFolder(dest_wv,2), basename,suffix,GetWavesDataFolder(scannum_wv,2))
 		endif
-
 end
 Function MDA_MakeSummary()
 	setdatafolder root:
@@ -1415,7 +1423,189 @@ Function MDA_MakeSummary()
 	endfor
 	setdatafolder dfr
 end	
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////		mda Panel		//////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+Macro mdaKey_Panel()
+	If(WinType("ncKeyPanel")!=7)
+		mdaKeyPanel_Variables()
+		mdaKeyPanel_Setup()
+	else
+		dowindow/f mdaKeyPanel
+	endif
+end
+Function mdaKeyPanel_Variables()
+	DFREF saveDFR = GetDataFolderDFR()
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	NewDataFolder/o/s root:mdaKeyPanel
+	SetDataFolder saveDFR
+	string/g $(df+"key"), $(df+"fldname"), $(df+"fldlist"),$(df+"ExtraPVList")
+	string/g $(df+"val")
+	svar key=$(df+"key"), fldname=$(df+"fldname"), fldlist=$(df+"fldlist"),ExtraPVList=$(df+"ExtraPVList")
+	key="";fldname="";fldlist="Select Wave;",ExtraPVList="Select Attribute"
+	fldlist=mdaPanel_FolderListGet()
+	make/t/n=(itemsinlist(fldlist,";"))$(df+ "fldlist_wv")
+	wave/t	fldlist_wv=$(df+ "fldlist_wv")
+	fldname=stringfromlist(0,fldlist,";")
+	nvar val=$(df+"val")
+	val=nan
+end
+Function mdaKeyPanel_Setup()
+	DFREF saveDFR = GetDataFolderDFR()
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	svar key=$(df+"key"), fldname=$(df+"fldname"), fldlist=$(df+"fldlist")
+	svar val=$(df+"val")
+	NewPanel /W=(514,454,779,535) 
+	DoWindow/C/T/R $dfn,dfn
+	setwindow $dfn, hook(cursorhook)=mdaKeyPanel_Hook, hookevents=3, hook=$""
+	ModifyPanel cbRGB=(1,52428,52428)
+	PopupMenu popupFolderList,pos={8,8},size={95,20},proc=mdaKeyPanel_PopMenuFolderList,title="Folder List"
+	PopupMenu popupFolderList,mode=1,popvalue="---",value= #(df+"fldlist") 
+	PopupMenu popupKeyList,pos={7,31},size={193,15},proc=mdaKeyPanel_PopMenuExtraPVList,title="Extra PVs List"
+	PopupMenu popupKeyList,mode=1,value= #(df+"ExtraPVList")
+	SetVariable setvarVal,pos={6,51},size={223,15}
+	SetVariable setvarVal,limits={-inf,inf,0},value= root:mdaKeyPanel:val
+	Button buttonF title=">",pos={200,7},size={15,20},proc=mdaKeyPanel_ButtonProcs
+	Button buttonR title="<",pos={180,7},size={15,20},proc=mdaKeyPanel_ButtonProcs
+
+	
+	SetDataFolder saveDFR
+end
+
+
+Function mdaKeyPanel_ButtonProcs(B_Struct) : ButtonControl
+	STRUCT WMButtonAction &B_Struct
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	svar fldlist=$(df+"fldlist"),fldname=$(df+"fldname")
+	variable which=whichlistitem(fldname,fldlist,";")
+	Switch(B_Struct.eventCode)
+		case 2: 		//Mouse up
+			variable i
+			strSwitch(B_Struct.ctrlName)
+				case "buttonF":
+					i=1
+					break
+				case  "buttonR":
+					i=-1
+					break
+			endswitch	
+			if((which+i)>itemsinlist(fldlist,";"))
+				which=0
+			elseif((which+i)<0)
+				which=itemsinlist(fldlist,";")
+			else
+				which=i+which
+			endif
+			fldname=stringfromlist(which,fldlist,";")
+			STRUCT WMPopupAction pa
+			pa.ctrlName="popupFolderList"
+			pa.popStr=fldname
+			pa.popNum=which
+			mdaKeyPanel_PopMenuFolderList(pa)
+			 PopupMenu popupFolderList,mode=1,popvalue=fldname//,value=fldlist 
+		break
+	endswitch
+End
+
+Function mdaKeyPanel_PopMenuExtraPVList(ctrlName,popNum,popStr) : PopupMenuControl
+	String ctrlName
+	Variable popNum	// which item is currently selected (1-based)
+	String popStr		// contents of current popup item as string
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	svar fldname=$(df+"fldname"), ExtraPVList=$(df+"ExtraPVList"), key=$(df+"key")
+	svar val=$(df+"val")
+	ExtraPVList=mdaPanel_ExtraPVList(fldname)
+	key=popStr
+	val= ExtraPVstr("root:"+fldname+":",key)
+	return 0
+End		
+
+Function mdaKeyPanel_PopMenuFolderList(pa) : PopupMenuControl
+	STRUCT WMPopupAction &pa
+	pa.blockReentry = 1
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	svar fldname=$(df+"fldname"), fldlist=$(df+"fldlist")
+	svar ExtraPVList=$(df+"ExtraPVList"), key=$(df+"key")
+	fldlist=mdaPanel_FolderListGet()
+	variable keynum=whichlistitem(key,ExtraPVList,";")+1
+	
+	Variable popNum = pa.popNum
+	String popStr = pa.popStr
+	fldname=popStr
+	PopupMenu popupFolderList popvalue=popStr
+	wave wv=$GetIndexedObjName("root:"+fldname+":", 1, 0)
+	mdaKeyPanel_PopMenuExtraPVList("popupKeyList",keynum,key)
+
+	return 0
+End
+
+Function/s mdaPanel_FolderListGet() //currently only works for folders in root directory
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	string fldlist=""
+	variable i
+	for (i=0;i<countobjectsdfr(root:, 4);i+=1)
+		string folder=GetIndexedObjNameDFR(root:, 4, i )
+		if(stringmatch(folder,"mda_*")==1)
+			fldlist=addlistitem(folder,fldlist, ";")
+		endif
+	endfor
+	fldlist=sortlist(fldlist,";",16)
+	return fldlist
+end
+
+Function/s mdaPanel_ExtraPVList(fldname)
+	string fldname
+	setdatafolder $("root:"+fldname+":")
+	wave wv=$GetIndexedObjName("root:"+fldname+":", 1, 0)
+	string tmp=note(wv)
+	string ExtraPVList=""
+	variable i
+	for(i=10;i<itemsinlist(tmp,";");i+=1)
+		string PV=stringfromlist(i,tmp,";")
+		PV=PV[strsearch(PV,":",0)+2,strsearch(PV,",",0)-1]
+		ExtraPVList=addlistitem(PV,ExtraPVList, ";")
+	endfor
+	setdatafolder root:
+	return ExtraPVList
+end
+
+	
+Function mdaKeyPanel_SetVarProc(sva) : SetVariableControl
+	STRUCT WMSetVariableAction &sva
+	string dfn="mdaKeyPanel", df="root:"+dfn+":"
+	svar key=$(df+"key"), fldname=$(df+"fldname")
+	nvar val=$(df+"val")
+	wave wv=$fldname
+	string pvlist=note(wv), pv
+	pvlist=listmatch(pvlist,"*"+key+"*")
+	pv="\r"+key
+	switch( sva.eventCode )
+		case 1: // mouse up
+		case 2: // Enter key
+		case 3: // Live update
+			Variable dval = sva.dval
+			String sval = sva.sval
+				string  keysep=":",listsep=";"
+				val=WavenoteKeyVal(fldname,pv,keysep,listsep) 
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+Function mdaKeyPanel_Hook(H_Struct)
+	STRUCT WMWinHookStruct &H_Struct
+	variable eventCode = H_Struct.eventCode
+	string dfn=H_Struct.winName; string df="root:"+dfn+":"
+	if(eventcode==2)
+		dowindow /F $dfn
+		JLM_FileLoaderModule#killallinfolder(df)
+		killdatafolder $df
+		return(-1)
+	endif
+end
 
 
 //////////////////////////////////Load Tif///////////////////////////////////
@@ -1984,7 +2174,9 @@ Function ncNote2waveDialog()
 	endif
 
 end
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////		nc Panel		//////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
 Macro ncKey_Panel()
 	If(WinType("ncKeyPanel")!=7)
 		ncKeyPanel_Variables()
@@ -2027,8 +2219,44 @@ Function ncKeyPanel_Setup()
 	PopupMenu popupKeyList,mode=1,value= #(df+"AttrList")
 	SetVariable setvarVal,pos={6,51},size={223,15}
 	SetVariable setvarVal,limits={-inf,inf,0},value= root:ncKeyPanel:val
+	Button buttonF title=">",pos={200,7},size={15,20},proc=ncKeyPanel_ButtonProcs
+	Button buttonR title="<",pos={180,7},size={15,20},proc=ncKeyPanel_ButtonProcs
 	SetDataFolder saveDFR
 end
+Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
+	STRUCT WMButtonAction &B_Struct
+	string dfn="ncKeyPanel", df="root:"+dfn+":"
+	svar wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
+	variable which=whichlistitem(wvname,wvlist,";")
+	Switch(B_Struct.eventCode)
+		case 2: 		//Mouse up
+			variable i
+			strSwitch(B_Struct.ctrlName)
+				case "buttonF":
+					i=1
+					break
+				case  "buttonR":
+					i=-1
+					break
+			endswitch	
+			if((which+i)>itemsinlist(wvlist,";"))
+				which=0
+			elseif((which+i)<0)
+				which=itemsinlist(wvlist,";")
+			else
+				which=i+which
+			endif
+			wvname=stringfromlist(which,wvlist,";")
+			STRUCT WMPopupAction pa
+			pa.ctrlName="popupFolderList"
+			pa.popStr=wvname
+			pa.popNum=which
+			pa.eventCode=2
+			ncKeyPanel_PopMenuWaveList(pa)
+			 PopupMenu popupWaveList,mode=1,popvalue=wvname//,value=fldlist 
+		break
+	endswitch
+End
 
 Function ncKeyPanel_PopMenuAttrList(ctrlName,popNum,popStr) : PopupMenuControl
 	String ctrlName
@@ -2059,14 +2287,11 @@ Function ncKeyPanel_PopMenuWaveList(pa) : PopupMenuControl
 			String popStr = pa.popStr
 			wvname=popStr
 			wave wv=$wvname
-	//		PopupMenu popupKeyList,mode=1,value= #(df+"AttrList")
 			ncKeyPanel_PopMenuAttrList("popupKeyList",keynum,key)
-
 			break
 		case -1: // control being killed
 			break
 	endswitch
-//	ncKeyPanel_SetVarProc(3)
 	return 0
 End
 
