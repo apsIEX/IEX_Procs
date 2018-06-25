@@ -29,8 +29,9 @@ Menu "Graph"
 		 "SetDataFolder to top image or trace", SetDataFolderTopImageTrace()
 	end
 end			
-
-////////Windows Tools /////////////
+//////////////////////////////////////////////////////
+//////////////  --- Windows Tools --- ///////////////////
+//////////////////////////////////////////////////////
 Function DupWinSize_Dialog()
 	string source, win
 	Prompt source, "Original", popup, WinList("*", ";","WIN:3")
@@ -44,21 +45,19 @@ Function DupWinSize(Source,Win) //Resizes Window Win to that of  Source
 	Getwindow $Source wsize
 	MoveWindow/W=$Win V_left, V_top, V_right, V_bottom
 end
-////////Graph Tools /////////////
+//////////////////////////////////////////////////////
+///////////////// ---Graph Tools --- ///////////////////
+//////////////////////////////////////////////////////
+Function CopyWaveColors(Graph_Source,Graph_Copy)
+	string Graph_Source,Graph_Copy
+	DoWindow/F $Graph_Source
+	String Tlist_Source, Tlist_Copy
+	String ColorList_Source, ColorList_Copy
+End
 
-Function GraphAllWavesinFolder()
-	display
-	DFREF dfr=getdatafolderDFR()
-	variable i
-	For(i=0;i<CountObjectsDFR(dfr,1);i+=1)
-		wave wv=$GetIndexedObjNameDFR(dfr, 1, i)
-		appendtograph wv
-	endfor	
-	LedgendwithFolders()
-	movewindow 585,150,1085,550
-	ModifyGraph margin(right)=180
-end
-
+//////////////////////////////////////////////////////
+////////////////// ---Legend --- //////////////////////
+//////////////////////////////////////////////////////
 Function LedgendwithFolders() //Adds the datafolder to the legend
 	Legend/C/N=text0/A=MC
 	string tlist=tracenamelist("",";",1)
@@ -80,6 +79,25 @@ Function LedgendwithFolders() //Adds the datafolder to the legend
 	txt=txt[0,strlen(txt)-1]
 	Legend/C/N=text0/J txt
 end
+
+Function LegendfromList(LegendList,Title,overwrite) //overwrite ==0 to include tracename
+	String LegendList,Title
+	variable overwrite
+	string tlist=tracenamelist("",";",1)
+	variable i
+	string txt=Title
+	For(i=0;i<itemsinlist(tlist,";");i+=1)
+		if (overwrite==0)
+			txt=txt+"\r\\s("+stringfromlist(i,tlist,";")+") "+stringfromlist(i,tlist,";")+"   "+stringfromlist(i,LegendList,";")
+		else
+			txt=txt+"\r\\s("+stringfromlist(i,tlist,";")+") "+stringfromlist(i,LegendList,";")
+		endif
+	endfor
+	Legend/C/N=text0/J txt
+end
+//////////////////////////////////////////////////////
+//////////////// --- Graph Title --- ////////////////////
+//////////////////////////////////////////////////////
 Function Image_FolderinTitle() //sets the graph title to the image's wave name
 	wave wv=ImageNameToWaveRef(WinName(0,1),stringfromlist(0,ImageNameList("",";"),";"))
 	string fld=GetWavesDataFolder(wv, 0 )
@@ -87,31 +105,7 @@ Function Image_FolderinTitle() //sets the graph title to the image's wave name
 	string name=WinName(0,1)+":"+fld
 	DoWindow/T $WinName(0,1),name
 end	
-Function SetDataFolderTopImageTrace()
-	wave wv=ImageNameToWaveRef(WinName(0,1),stringfromlist(0,ImageNameList("",";"),";"))
-	if(WaveExists(wv)==0)
-		wave wv=tracenametowaveref("",stringfromlist(0,tracenamelist("",";",1),";") )
-	endif
-	DFREF dfr=GetWavesDataFolderDFR(wv)
-	setdatafolder dfr
-end	
-Function MakeGraphListWave()
-	string gtitlelist, gnamelist, gtitle, gname, df //df=datafolder of first trace
-	gnamelist=winlist("*",";","WIN:1")
-	gtitlelist=""
-	variable i
-	make/o/n=(itemsinlist(gnamelist,";"),3)/t root:graphlist
-	wave/t graphlist=root:graphlist
-	For(i=0;i<itemsinlist(gnamelist,";");i+=1)
-		gname=stringfromlist(i,gnamelist,";")
-		gtitle=windowtitle(gname)
-		df=getwavesdatafolder(tracenametowaveref(gname, stringfromlist(0,tracenamelist(gname,";",1),";")),0)
-		gtitlelist=addlistitem(gtitle,gtitlelist,";",i)
-		graphlist[i][0]=gtitle
-		graphlist[i][1]=gname
-		graphlist[i][2]=df
-	endfor
-end
+
 Function/S WindowTitle(WindowName) // Returns the title of a window given its name.
         String WindowName // Name of graph, table, layout, notebook or control panel.
          String RecMacro
@@ -135,7 +129,56 @@ Function/S WindowTitle(WindowName) // Returns the title of a window given its na
         endif
          return TitleString
 End
+//////////////////////////////////////////////////////
+///////// --- SetDataFolder to top image  --- //////////////
+//////////////////////////////////////////////////////
+Function SetDataFolderTopImageTrace()
+	wave wv=ImageNameToWaveRef(WinName(0,1),stringfromlist(0,ImageNameList("",";"),";"))
+	if(WaveExists(wv)==0)
+		wave wv=tracenametowaveref("",stringfromlist(0,tracenamelist("",";",1),";") )
+	endif
+	DFREF dfr=GetWavesDataFolderDFR(wv)
+	setdatafolder dfr
+end	
+//////////////////////////////////////////////////////
+///// ---Make wave with all wavelist from graph  --- ////////
+//////////////////////////////////////////////////////
+Function MakeGraphListWave()
+	string gtitlelist, gnamelist, gtitle, gname, df //df=datafolder of first trace
+	gnamelist=winlist("*",";","WIN:1")
+	gtitlelist=""
+	variable i
+	make/o/n=(itemsinlist(gnamelist,";"),3)/t root:graphlist
+	wave/t graphlist=root:graphlist
+	For(i=0;i<itemsinlist(gnamelist,";");i+=1)
+		gname=stringfromlist(i,gnamelist,";")
+		gtitle=windowtitle(gname)
+		df=getwavesdatafolder(tracenametowaveref(gname, stringfromlist(0,tracenamelist(gname,";",1),";")),0)
+		gtitlelist=addlistitem(gtitle,gtitlelist,";",i)
+		graphlist[i][0]=gtitle
+		graphlist[i][1]=gname
+		graphlist[i][2]=df
+	endfor
+end
 
+//////////////////////////////////////////////////////
+//////// --- Graph all waves in data folder --- ////////////
+//////////////////////////////////////////////////////
+Function GraphAllWavesinFolder()
+	display
+	DFREF dfr=getdatafolderDFR()
+	variable i
+	For(i=0;i<CountObjectsDFR(dfr,1);i+=1)
+		wave wv=$GetIndexedObjNameDFR(dfr, 1, i)
+		appendtograph wv
+	endfor	
+	LedgendwithFolders()
+	movewindow 585,150,1085,550
+	ModifyGraph margin(right)=180
+end
+//////////////////////////////////////////////////////
+//////////// --- Integrate 2D Image --- //////////////////
+//////////////////////////////////////////////////////
 Proc Integrate2Dli(mat,xmi,xma,ymi,yma) //from Rubin Reininger
 //Converted it to a function to make faster. Took out second parameter, just a string name
 	String mat
@@ -190,7 +233,9 @@ Function Integrate2DliF(mat,xmi,xma,ymi,yma)
 //	print integRe
 	return integRe
 End
-
+//////////////////////////////////////////////////////
+/////////////// --- Crop an  Image --- //////////////////
+//////////////////////////////////////////////////////
 Function Crop_xy_Dialog()
 	variable first_x, last_x, first_y, last_y
 	string wvname
