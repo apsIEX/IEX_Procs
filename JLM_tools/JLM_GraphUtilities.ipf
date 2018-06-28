@@ -12,10 +12,11 @@ Menu "APS Procs"
 		"Graph all waves in DataFolder",GraphAllWavesinFolder()
 		"----------------"
 		"Add DataFolder to legend",LedgendwithFolders()
-		"Title = Top Image Folde",Image_FolderinTitle()
+		"Title = Top Image Folder",Image_FolderinTitle()
 		"Set DataFolder to top image or trace",SetDataFolderTopImageTrace()
 		"Make wave with all wavelist from graph",MakeGraphListWave()
-		"----------------"		
+		"----------------"	
+		"Average Image", ImgAvg_dialog()	
 		"Integrate image", Integrate2Dli()	
 		"Crop Image", Crop_xy_Dialog()
 		
@@ -27,6 +28,7 @@ Menu "Graph"
 		"Ledgend with Folders", LedgendwithFolders()
 		"Title = Top Image Folder", Image_FolderinTitle()
 		 "SetDataFolder to top image or trace", SetDataFolderTopImageTrace()
+		 
 	end
 end			
 //////////////////////////////////////////////////////
@@ -176,6 +178,27 @@ Function GraphAllWavesinFolder()
 	movewindow 585,150,1085,550
 	ModifyGraph margin(right)=180
 end
+/////////////////////////////////////////////////////////////////////////
+///////////////////////////Average Image///////////////////////////	
+/////////////////////////////////////////////////////////////////////////
+
+Function ImgAvg_dialog()
+	string wvname,suffix="avg"
+	variable axis
+	prompt wvname, "Wave:", popup, "-----2D------;"+WaveList("*",";","DIMS:2")
+	Prompt axis, "axis to average", popup, "x-axis;y-axis"
+	Prompt suffix,"suffix"
+	DoPrompt "Average Image", wvname, axis,suffix
+	if(v_flag==0)
+		wave wv=$wvname
+		string A=selectstring(axis-1,"Y","X")
+		string opt="/"+A+"/D="+GetWavesDataFolder($nameofwave(wv),2)+suffix
+		print "ImgAvg("+nameofwave(wv)+",\""+opt+"\")"
+		ImgAvg(wv,opt)
+	endif
+end
+
+
 //////////////////////////////////////////////////////
 //////////// --- Integrate 2D Image --- //////////////////
 //////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ Menu "APS Procs"
 		"FitFermiGraph",FitFermiGraph()
 		"FFT to remove SES mesh", RemoveSESmesh_Dialog()
 		"Set df and fit with cursors", print "FolderNFit(fittype)"
+		"Normalize Spectra XPS/XAS", Spectra_Norm_fromGraph_Dialog()
 	
 	end
 end
@@ -290,6 +291,71 @@ Function FitFermiGraph()
 	endif
 End
 /////////////////////////////////////////////////////////////////////////
+/////////////////////////// Normalize XPS, XAS /////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+Function Spectra_Norm_fromGraph_Dialog()
+	string wvname
+	variable p1,p2,ReplaceTraces,SRonly
+	//get cusors from top graph
+	p1=selectnumber(strlen(CsrInfo(A)),0,pcsr(A,""))
+	p2=selectnumber(strlen(CsrInfo(B)),inf,pcsr(B,""))
+	Prompt wvname, "Wave to normalize",popup,TraceNamelist("",";",1)+";--- All ---"
+	Prompt p1, "Range: pnt1"
+	Prompt p2, "Range: pnt2"
+	Prompt SRonly, "Norm:" popup, "SRcurrent only; Max=1,Min=0; Max/Min set by cursors"
+	Prompt ReplaceTraces,"Graph options:" popup,"Replace Traces;New Graph;none"
+	DoPrompt "Normalize Spectra", wvname, p1,p2,SRonly,ReplaceTraces
+	if(v_flag==0)
+		if(cmpstr(wvname,"--- All ---")==0)
+			wvname=TraceNamelist("",";",1)
+		endif
+		string wvlist=""
+		variable i
+		for(i=0;i<itemsinlist(wvname,";");i+=1)
+			wave wv=TraceNameToWaveRef("",stringfromlist(i,wvname,";"))
+			wvlist=addlistitem(GetWavesDataFolder($nameofwave(wv),2),wvlist,";",inf)
+		endfor
+		print "Spectra_Norm(\""+wvlist+"\","+num2str(p1)+","+num2str(p2)+","+num2str(SRonly-1)+")"
+		Spectra_Norm(wvlist,p1,p2,SRonly)
+		if(ReplaceTraces==1)
+			for(i=0;i<itemsinlist(wvname,";");i+=1)
+				ReplaceWave/Y trace=$stringfromlist(i,wvname) $stringfromlist(i,wvlist)+"_norm"
+			endfor
+		elseif(ReplaceTraces==2)
+			display
+			for(i=0;i<itemsinlist(wvname,";");i+=1)
+				appendtograph $stringfromlist(i,wvlist)+"_norm"
+			endfor
+		endif
+	endif
+end
+
+Function Spectra_Norm(wvlist,p1,p2,Method) //Method=0 divide by the ring curren only;Method=1normalize to max=1/min=0;Method=2  csr(A)=Min/csr(B)=Max
+	string wvlist
+	variable p1,p2,Method
+	variable i,ymax,ymin
+	for(i=0;i<itemsinlist(wvlist,";");i+=1)
+		wave wv=$stringfromlist(i,wvlist,";")
+		setdatafolder GetWavesDataFolderDFR(wv )
+		duplicate/o wv $stringfromlist(i,wvlist,";")+"_norm"
+		wave wv_norm= $stringfromlist(i,wvlist,";")+"_norm"
+		variable I0=str2num(WaveNoteKeySearch(wv,"\r"+"Attr_RingCurrent")) 
+		if (Method==0)
+			wv_norm=wv/I0
+		elseif(Method==1)
+			wavestats/q/R=[p1,p2] wv_norm
+			ymax=v_max
+			ymin=v_min
+			wv_norm=(wv_norm-ymin)/(ymax-ymin)
+		elseif(Method==2)
+			ymin=SelectNumber(wv[p1]<wv[p2],wv[p2],wv[p1])
+			ymax=SelectNumber(wv[p1]>wv[p2],wv[p2],wv[p1])
+			wv_norm=(wv_norm-ymin)/(ymax-ymin)
+		endif
+	endfor
+end
+
+/////////////////////////////////////////////////////////////////////////
 //////////////////////Folder Fits//////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
@@ -337,18 +403,6 @@ Menu "APS Procs"
 	End
 End
 
-/////////////////////////////////////////////////////////////////////////
-///////////////////////////Average Image///////////////////////////	
-/////////////////////////////////////////////////////////////////////////
-
-Function ImAvgY_dialog()
-//	prompt wv
-//newname
-	wave wv
-	string newname
-	string opt="/X/D=root:"+newname+"avgy"
-	ImgAvg(wv,opt)
-end
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////// Transpose Wave Axes //////////////////////////	
