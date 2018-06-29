@@ -15,6 +15,7 @@ Menu "APS Procs"
 		"Title = Top Image Folder",Image_FolderinTitle()
 		"Set DataFolder to top image or trace",SetDataFolderTopImageTrace()
 		"Make wave with all wavelist from graph",MakeGraphListWave()
+		 "Legend from list",  "LegendfromList(LegendList,Title,overwrite)"
 		"----------------"	
 		"Average Image", ImgAvg_dialog()	
 		"Integrate image", Integrate2Dli()	
@@ -24,10 +25,11 @@ Menu "APS Procs"
 End
 
 Menu "Graph"
-	submenu "Folder_Tools"
+	submenu "IEX Graph Tools"
 		"Ledgend with Folders", LedgendwithFolders()
 		"Title = Top Image Folder", Image_FolderinTitle()
 		 "SetDataFolder to top image or trace", SetDataFolderTopImageTrace()
+		 "Legend from list", print "LegendfromList(LegendList,Title,overwrite)"
 		 
 	end
 end			

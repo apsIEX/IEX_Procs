@@ -11,7 +11,7 @@ Menu "APS Procs"
 		"FitFermiGraph",FitFermiGraph()
 		"FFT to remove SES mesh", RemoveSESmesh_Dialog()
 		"Set df and fit with cursors", print "FolderNFit(fittype)"
-		"Normalize Spectra XPS/XAS", Spectra_Norm_fromGraph_Dialog()
+		"Normalize Spectra XPS_XAS", Spectra_Norm_fromGraph_Dialog()
 	
 	end
 end
