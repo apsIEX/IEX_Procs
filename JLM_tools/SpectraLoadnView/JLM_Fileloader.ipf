@@ -1265,10 +1265,10 @@ Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "Wave note tools"	
 			Submenu "MDA Tools"
-				"MDA Extra PVs -- list all", ExtraPVnotebook()
-				"MDA keyword search", print "ExtraPVstrList(\"pv\")"
-				"MDA Extra PV val", print "ExtraPVva(\"pv\")"
+				"MDA Extra PVs panel",mdaKey_Panel()
 				"MDA Extra PV to wave", ExtraPV2waveDialog()
+				"MDA Extra PVs -- list all", ExtraPVnotebook()
+				"MDA Extra PV value",  "ExtraPVva(\"pv\") or ExtraPVstr(\"df\",\"pv\")"
 				"MDA Summarize all loaded folders",MDA_MakeSummary()
 				"MDA Tools Help", MDAToolsHelp()
 			end
