@@ -6,21 +6,21 @@
 
 Menu "APS Procs"
 	Submenu "Math & Conversions"	
-		"asind" ,print "print asind(x)"
-		"acosd" ,print "print acosd(x)"
-		"atand" ,print "print atand(x)"
-		"sind" ,print "print sind(x)"
-		"cosd" ,print "print cosd(x)"
-		"tand" ,print "print tand(x)"		
+		"asind" ,print "asind(x)"
+		"acosd" ,print "acosd(x)"
+		"atand" ,print "atand(x)"
+		"sind" ,print "sind(x)"
+		"cosd" ,print "cosd(x)"
+		"tand" ,print "tand(x)"		
 		"------------------"
-		"mrad2deg", print "print mrad2deg(x)"
-		"deg2mrad", print "print deg2mrad(x)"
-		"mrad2arcsec",print "print mrad2arcsec(x)"
-		"arcsec2mrad" ,print "print arcsec2mrad(x) "
-		"eV2nm" ,print "print eV2nm(x)"
-		"nm2eV" ,print "print nm2eV(x)"
-		"k_e" ,print "k_e(E)"
-		"q_hv",print "q_hv(hv)"
+		"mrad2deg", print "mrad2deg(x)"
+		"deg2mrad", print "deg2mrad(x)"
+		"mrad2arcsec",print "mrad2arcsec(x)"
+		"arcsec2mrad" ,print "arcsec2mrad(x) "
+		"eV2nm" ,print "eV2nm(x)"
+		"nm2eV" ,print "nm2eV(x)"
+		"k_e" ,print "k_e(eV)"
+		"q_hv [A-1]", print "q_hv(eV)"
 		"------------------"			
 		"FWHM Lorentzian", print "FWHM_LW(x)"
 		"FWHM Gaussian", print "FWHM_GW(w_coef)"
@@ -124,13 +124,32 @@ end
 
 
 //////////////////Momentum-space
-Function k_e(E) //momentum of an electron
-	variable E //E=hv+W in eV
-	return 0.5124*sqrt(E)
+Function k_e(eV) //momentum of an electron
+	variable eV //eV=hv-W 
+	return 0.5124*sqrt(eV)
 end
 
-Function q_hv(hv)//momentum of a photon
-	variable hv
-	variable lA=eV2nm(hv)*10//wavelength in angstroms
-	return 2*pi/lA
+Function q_hv(eV)//momentum of a photon in inverse angstroms
+	variable eV
+	variable q_hv=2*pi/12398.4193*eV  //[2pi/(hc)=5.06773E-4]
+	return q_hv
+end
+
+Function d_spacing_nm(eV,th) //Bragg's Law: 2*d*sin(th)=n*lambda
+	variable eV, th
+	variable l_nm=eV2nm(eV)
+	variable d=l_nm/2/sin(th/180*pi)
+	return d
+end
+Function d_spacing_A(eV,th) //Bragg's Law: 2*d*sin(th)=n*lambda
+	variable eV, th
+	variable l_nm=eV2nm(eV)
+	variable d=l_nm/2/sin(th/180*pi)*10
+	return d
+end
+Function Bragg_Angle(eV,d) //Bragg's Law: 2*d*sin(th)=n*lambda
+	variable eV, d
+	variable l_nm=eV2nm(eV)
+	variable th=asin(l_nm/2/d)*180/pi
+	return th
 end

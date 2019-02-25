@@ -1269,7 +1269,7 @@ Menu "APS Procs"
 				"MDA Extra PV to wave", ExtraPV2waveDialog()
 				"MDA Extra PVs -- list all", ExtraPVnotebook()
 				"MDA Extra PV value",  "ExtraPVva(\"pv\") or ExtraPVstr(\"df\",\"pv\")"
-				"MDA Summarize all loaded folders",MDA_MakeSummary()
+				"MDA Summarize all loaded folders",ExtraPVSummarizeMDAFolders("X29id*")
 				"MDA Tools Help", MDAToolsHelp()
 			end
 		end
@@ -1353,76 +1353,45 @@ Function ExtraPV2waveDialog()
 		ExtraPVs2wave(pv, GetWavesDataFolder(dest_wv,2), basename,suffix,GetWavesDataFolder(scannum_wv,2))
 		endif
 end
-Function MDA_MakeSummary()
-	setdatafolder root:
-	string basename="mda_", suffix=""
-	variable i,j
-	// Data folder list //
+Function ExtraPVSummarizeMDAFolders(matchstr)
+	string matchstr
 	DFREF dfr = GetDataFolderDFR()
-	string df="root:mdaSummary:"
-	newdatafolder/o root:mdaSummary
-	string folder="", folderlist=""
-	for (i=0;i<countobjectsdfr(dfr, 4);i+=1)
-		folder=GetIndexedObjNameDFR(dfr, 4, i )
-		folderlist=addlistitem(folder,folderlist, ";")
-	endfor
-	folderlist=sortlist(folderlist,";",16)
-	folderlist=JLM_FileLoaderModule#ReduceList(folderlist, basename+"*" ) 
-	folderlist=JLM_FileLoaderModule#ReduceList(folderlist,"*"+suffix)
-	//Extra PV info//
-	setdatafolder $stringfromlist(0,folderlist,";")
-	wave wv=$(GetIndexedObjName("", 1, 0))
-	string buffer=note(wv)
-	string PVlist=""
-	//Make Extra PV waves
-	For (i=0;i<itemsinlist(buffer,";");i+=1)
-			string tmp=stringfromlist(i,buffer,";")
-			tmp=stringfromlist(0,tmp,",")
-			tmp=tmp[strsearch(tmp,":",0)+2,inf] //get PV name from ExtraPVs
-			//testing is extra pv is string or variable 
-			string extrapv=ExtraPVstrList(tmp)
-			string valstr=stringfromlist(2,extrapv,",")
-			valstr=valstr[2,strlen(valstr)-2]
-			if(numtype(strlen(valstr))==0) //pv not an empty string
-				pvlist=addlistitem(tmp,pvlist, ";")
-	 			variable val=str2num(valstr[2,strlen(valstr)-2])
-				if(numtype(val)==2)
-					make/t/o/n=(itemsinlist(folderlist,";"))  $(df+cleanupname(tmp,0))
-				elseif(numtype(val)==0)
-					make/o/n=(itemsinlist(folderlist,";"))  $(df+cleanupname(tmp,0))
-				endif
-			endif
-	endfor	
-	// Make Summary Waves
-	make/o/T/n=(itemsinlist(folderlist,";")) $(df+"Scan_Name")
-	wave/T Scan_Name=$(df+"Scan_Name")
-	//Fill in Tables
-	for(i=0;i<itemsinlist(folderlist,";");i+=1)
-		Scan_Name[i]=stringfromlist(i,folderlist,";")
-		setdatafolder dfr
-		setdatafolder $(stringfromlist(i,folderlist,";"))
+	string fldlist=FolderListGet(dfr,matchstr)
+	variable i,j
+	for(i=0;i<itemsinlist(fldlist,";");i+=1)
+		dfref fldref=:$stringfromlist(i,fldlist)
+		wave wv=fldref:$GetIndexedObjNameDFR(fldref,1,0)
+		//Make Summary Wave
+		if(i==0)
+			string pvlist=mdaPanel_ExtraPVList(stringfromlist(i,fldlist))
+			string pvdesclist=mdaPanel_ExtraPVDescriptorList(stringfromlist(i,fldlist))
+			Make/o/T/n=(itemsinlist(fldlist,";")+1,itemsinlist(pvlist,";")+1) mda_Summary
+			wave/T mda_Summary
+			mda_Summary[0][0]="file"
+			//Make header for summary wave
+			for(j=0;j<itemsinlist(pvlist,";");j+=1)
+				wave/T mda_Summary
+				mda_Summary[0][j+1]=stringfromlist(j,pvlist,";")+";"+stringfromlist(j,pvdesclist,";")
+			endfor
+		endif
+		//Fill in Extra PV values for a given folder
 		for(j=0;j<itemsinlist(pvlist,";");j+=1)
-			//wave wv=$(df+cleanupname(stringfromlist(j,pvlist),0))
-			//wv[i]=ExtraPVval(stringfromlist(j,pvlist))
-			//testing is extra pv is string or variable 
-			tmp=stringfromlist(j,pvlist)
-			extrapv=ExtraPVstrList(tmp)
-			valstr=stringfromlist(2,extrapv,",")
-			valstr=valstr[2,strlen(valstr)-2]
-			if(numtype(strlen(valstr))==0)  //pv not an empty string
-	 			val=str2num(valstr[2,strlen(valstr)])
-				if(numtype(val)==2)
-					wave/t wvt=$(df+cleanupname(stringfromlist(j,pvlist),0))
-					wvt[i]=valstr
-				elseif(numtype(val)==0)
-					wave wv=$(df+cleanupname(stringfromlist(j,pvlist),0))
-					wv[i]=str2num(valstr)
-				endif
-			endif
+			wave/T mda_Summary
+			mda_Summary[i+1][0]=GetWavesDataFolder(wv, 0 )
+			string pv=stringfromlist(j,pvlist,";")
+			string valstr=ExtraPVstr(GetWavesDataFolder(wv, 1 ),pv)
+			mda_Summary[i+1][j+1]=valstr
 		endfor
 	endfor
-	setdatafolder dfr
-end	
+	//Brings table of wave to front or displays is not already existing
+	Dowindow mda_Summary
+	if(v_flag==1)
+		Dowindow/F mda_Summary
+	else
+		Edit/K=0 root:mda_Summary
+	endif
+End
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////		mda Panel		//////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1564,6 +1533,21 @@ Function/s mdaPanel_ExtraPVList(fldname)
 	for(i=10;i<itemsinlist(tmp,";");i+=1)
 		string PV=stringfromlist(i,tmp,";")
 		PV=PV[strsearch(PV,":",0)+2,strsearch(PV,",",0)-1]
+		ExtraPVList=addlistitem(PV,ExtraPVList, ";")
+	endfor
+	setdatafolder root:
+	return ExtraPVList
+end
+Function/s mdaPanel_ExtraPVDescriptorList(fldname)
+	string fldname
+	setdatafolder $("root:"+fldname+":")
+	wave wv=$GetIndexedObjName("root:"+fldname+":", 1, 0)
+	string tmp=note(wv)
+	string ExtraPVList=""
+	variable i
+	for(i=10;i<itemsinlist(tmp,";");i+=1)
+		string PV=stringfromlist(i,tmp,";")
+		PV=stringfromlist(1,PV,",")
 		ExtraPVList=addlistitem(PV,ExtraPVList, ";")
 	endfor
 	setdatafolder root:
@@ -1874,6 +1858,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
 		break
 		case 2://Baby Swept
+			Edelta=selectnumber(DetMode,-nc_Attr_EnergyStep_Fixed_RBV[0],nc_Attr_EnergyStep_Fixed_RBV[0])
 			Eunits=selectstring(DetMode,"Binding Energy (eV)","Kinetic Energy (eV)")
 			Ecenter=nc_Attr_CentreEnergy_RBV[0] 
 			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
@@ -1934,11 +1919,11 @@ Function IEX_SetEnergyScale_Dialog()
 	Emode=SelectNumber(cmpstr(Emodestr,"Binding Energy"),0,1)
 	Edim=SelectNumber(cmpstr(Edimstr,"t"),3,1+cmpstr(Edimstr,"y")) //dim from  popup list
 	if (v_flag==0)
-		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+","+num2str(Wk)+")"	
-		IEX_SetEnergyScale(wvname,Emode,Edim,Wk)
+		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Edim)+","+num2str(Emode)+","+num2str(Wk)+")"	
+		IEX_SetEnergyScale(wvname,Edim,Emode,Wk)
 	endif
 end
-Function IEX_SetEnergyScale(wvname,Emode,Edim, Wk)
+Function IEX_SetEnergyScale(wvname,Edim,Emode,Wk)
 	string wvname
 	variable Emode	// BE=0,KE=1
 	variable Edim, Wk
@@ -1993,19 +1978,20 @@ Function IEX_SetAngleScale(wvname,Adim,Aunits,A0)
 	variable Aoffset=dimoffset($wvname,Adim)	
 	Switch (Adim)
 		case 0:
-			SetScale/p x, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			//SetScale/p x, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname		
+			SetScale/p x, Aoffset-A0,Astep,Aunits,$wvname		
 			break
 		case 1:
-			SetScale/p y, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			SetScale/p y, Aoffset-A0,Astep,Aunits,$wvname			
 			break
 		case 2:
-			SetScale/p z, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			SetScale/p z, Aoffset-A0,Astep,Aunits,$wvname			
 			break
 		case 3:
-			SetScale/p t, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
+			SetScale/p t, Aoffset-A0,Astep,Aunits,$wvname			
 			break
 		Endswitch	
-	print "dimoffset("+wvname+","+num2str(Adim)+")  "+num2str(Aoffset)+"  =>  "+num2str(Aoffset+A0) 	
+	print "dimoffset("+wvname+","+num2str(Adim)+")  "+num2str(Aoffset)+"  =>  "+num2str(Aoffset-A0) 	
 End
 
 //Dither Procedures
@@ -2223,7 +2209,7 @@ Function ncKeyPanel_Setup()
 	Button buttonR title="<",pos={180,7},size={15,20},proc=ncKeyPanel_ButtonProcs
 	SetDataFolder saveDFR
 end
-Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
+Function ncKeyPanel_ButtonProcs_backup(B_Struct) : ButtonControl
 	STRUCT WMButtonAction &B_Struct
 	string dfn="ncKeyPanel", df="root:"+dfn+":"
 	svar wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
@@ -2257,7 +2243,48 @@ Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
 		break
 	endswitch
 End
-
+Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
+	STRUCT WMButtonAction &B_Struct
+	string dfn="ncKeyPanel", df="root:"+dfn+":"
+	svar wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
+	variable which=whichlistitem(wvname,wvlist,";")
+	Switch(B_Struct.eventCode)
+		case 2: 		//Mouse up
+		variable i=0
+		StrSwitch(B_Struct.ctrlName)
+			case "buttonF":
+				i=1
+				break
+			case  "buttonR":
+				i=-1
+				break
+			case "buttonCMDline":
+				svar key=$(df+"key")
+				string pv="\r"+key
+				string  keysep=":",listsep=";"
+				print "WavenoteKeyVal("+wvname+","+pv+","+keysep+","+listsep+")" 	
+				break
+			break
+			endswitch	
+			//Folder advance
+			if((which+i)>itemsinlist(wvlist,";"))
+				which=0
+			elseif((which+i)<0)
+				which=itemsinlist(wvlist,";")
+			else
+				which=i+which
+			endif
+			wvname=stringfromlist(which,wvlist,";")
+			STRUCT WMPopupAction pa
+			pa.ctrlName="popupFolderList"
+			pa.popStr=wvname
+			pa.popNum=which
+			pa.eventCode=2
+			ncKeyPanel_PopMenuWaveList(pa)
+			 PopupMenu popupWaveList,mode=1,popvalue=wvname//,value=fldlist 
+		break
+	endswitch
+End
 Function ncKeyPanel_PopMenuAttrList(ctrlName,popNum,popStr) : PopupMenuControl
 	String ctrlName
 	Variable popNum	// which item is currently selected (1-based)
@@ -2420,7 +2447,7 @@ Static Function/s Num2Str_SetLen(num,ndigits) //Make a string of a set character
 	if(strlen(zeros)>ndigits)
 	//	print "number is greater than number of digits"
 	elseif(strlen(zeros)<ndigits)
-		str=zeros[0,strlen(zeros)-floor(log(num))]+num2str(num)
+		str=zeros[0,strlen(zeros)-floor(log(num))]+num2istr(num)
 	endif
 	return str
 end
@@ -2449,6 +2476,23 @@ Static Function/s FolderNamewithNum(basename,scannum,suffix)
 	endfor
 
 end
+Static Function/s FolderListGet(dfr,matchstr)
+// returns an alphabetical list of folder names located in datafolder reference dfr with
+// a name matching matchstr; matchstr="*" for all folders"
+	DFREF dfr
+	string matchstr
+	string fldlist=""
+	variable i
+	for (i=0;i<countobjectsdfr(dfr, 4);i+=1)
+		string folder=GetIndexedObjNameDFR(dfr, 4, i )
+		if(stringmatch(folder,matchstr)==1)
+			fldlist=addlistitem(folder,fldlist, ";")
+		endif
+	endfor
+	fldlist=sortlist(fldlist,";",16)
+	return fldlist 
+
+End
 //=================== Wave note Procedures ===================
 //netcdf: key="/r....", keysp=":", listsep=";"
 Static Function WavenoteKeyVal(wvname,key,keysep,listsep)

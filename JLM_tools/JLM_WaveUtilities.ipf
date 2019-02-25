@@ -24,7 +24,7 @@ Function/s Num2Str_SetLen(num,ndigits) //Make a string of a set character length
 	if(strlen(zeros)>ndigits)
 	//	print "number is greater than number of digits"
 	elseif(strlen(zeros)<ndigits)
-		str=zeros[0,strlen(zeros)-floor(log(num))]+num2str(num)
+		str=zeros[0,strlen(zeros)-floor(log(num))]+num2istr(num)
 	endif
 	return str
 end
@@ -109,7 +109,14 @@ Function WavenoteKeyVal(wvname,key,keysep,listsep)
 	variable val=str2num(valstr)
 	return val
 end
-
+Function/s WavenoteKeyStr(wvname,key,keysep,listsep)
+	string wvname,key,keysep,listsep
+	wave wv=$(wvname)
+	string buffer=note(wv)
+	string tmp=listmatch(buffer,"*"+key+"*")
+	string valstr=stringbykey(key,tmp,keysep,listsep)
+	return valstr
+end
  Function WavenoteNotebook_Dialog()
  	string wvname
  	Prompt wvname, "Wave name:", popup, WaveList("*",";","")
@@ -143,3 +150,95 @@ Function WavenoteNotebook(wvname)
 end
 
 /////////////////////////////////////////////////////////////////////////
+//////////////////////////         Cropping     /////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+Menu "APS Procs"
+	submenu "Graph Utilities"
+		"Crop Wave", CropWave_Dialog()
+	end
+end
+Function CropWave_Dialog()
+	string wvname
+	string xscale="-inf,inf",yscale="-inf,inf",zscale="-inf,inf",tscale="-inf,inf"
+	Prompt wvname, "Wave:", popup, Wavelist("!*_CT",";","DIMS:2")+Wavelist("!*_CT",";","DIMS:3")
+	Prompt xscale,"x-scale:"
+	Prompt yscale,"y-scale:"
+	Prompt zscale,"z-scale:"
+	Prompt tscale,"t-scale:" 
+	DoPrompt "Crop wave:", wvname, xscale,yscale,zscale,tscale
+	variable x1=str2num(stringfromlist(0,xscale,","))
+	variable x2=str2num(stringfromlist(1,xscale,","))
+	variable y1=str2num(stringfromlist(0,yscale,","))
+	variable y2=str2num(stringfromlist(1,yscale,","))
+	variable z1=str2num(stringfromlist(0,zscale,","))
+	variable z2=str2num(stringfromlist(1,zscale,","))
+	variable t1=str2num(stringfromlist(0,tscale,","))
+	variable t2=str2num(stringfromlist(1,tscale,","))
+	if(v_flag==0)
+		wave wv=$wvname
+		print" CropWave("+wvname+","+xscale+","+yscale+","+zscale+tscale+")"
+		CropWave(wv,x1,x2,y1,y2,z1,z2,t1,t2)
+	endif
+end
+
+Function CropWave(wv,x1,x2,y1,y2,z1,z2,t1,t2)
+	wave wv
+	variable x1,x2,y1,y2,z1,z2,t1,t2
+	Switch(WaveDims(wv))
+		case 2:
+			Duplicate/o /r=(x1,x2)(y1,y2) wv $(nameofwave(wv)+"_c")
+			break
+		case 3:
+			Duplicate/o /r=(x1,x2)(y1,y2)(z1,z2) wv $(nameofwave(wv)+"_c")
+			break
+		case 4:
+			Duplicate/o /r=(x1,x2)(y1,y2)(z1,z2)(t1,t2) wv $(nameofwave(wv)+"_c")
+			break
+	endswitch
+end
+
+
+/////////////////////////////////////////////////////////////////////////
+//////////////////////////         Append Chunk     /////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+Menu "3D"
+	"Append Chunk", AppendChunk_Dialog()
+end
+
+Function AppendChunk_Dialog()
+	string wvnamesource
+	string wvnameappend
+	Prompt wvnamesource, "Base wave:", popup, "-3D-"+Wavelist("!*_CT",";","DIMS:3")+"-4D-"+Wavelist("!*_CT",";","DIMS:4")
+	Prompt wvnameappend, "Wave to append:", popup, "-3D-"+Wavelist("!*_CT",";","DIMS:3")+"-4D-"+Wavelist("!*_CT",";","DIMS:4")
+	DoPrompt "Appending a chunk (4D)", wvnamesource, wvnameappend
+	if(v_flag==0)
+		print "AppendChunk("+wvnamesource+","+wvnameappend+")"
+		wave wvsource=$wvnamesource
+		wave wvappend=$wvnameappend
+		AppendChunk(wvsource,wvappend)
+	endif
+end
+	
+Function AppendChunk(wvsource,wvappend)
+	wave wvsource, wvappend
+	//checking that the dimsizes are compatable
+	if(dimsize(wvsource,0)!=dimsize(wvappend,0))
+		print "wave dimensions are not the same (x)"
+		abort
+	elseif(dimsize(wvsource,1)!=dimsize(wvappend,1))
+		print "wave dimensions are not the same (y)"
+		abort
+	elseif(dimsize(wvsource,2)!=dimsize(wvappend,2))
+		print "wave dimensions are not the same (z)"
+		abort
+	endif
+	variable nt=dimsize(wvsource,3)
+	variable ntapp=max(1,dimsize(wvappend,3))
+	redimension/n=(-1,-1,-1,nt+ntapp+1) wvsource
+	if(WaveDims(wvsource)==3)
+		wvsource[][][][1]=wvappend[p][q][r]
+	elseif(WaveDims(wvsource)==4)
+		wvsource[][][][nt,]=wvappend[p][q][r][t-nt]
+	endif
+end
+

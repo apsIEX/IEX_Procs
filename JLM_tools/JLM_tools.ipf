@@ -17,16 +17,125 @@ Menu "APS Procs"
 end
 
 /////////////////////////////////////////////////////////////////////////
-///////////////Folder management Template //////////////////////////////////
+///////////////		Folder Procedures		 ////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
-Function ExecuteToAllinFolder()
-	variable n
-	DFREF dfr=getdatafolderDFR()
-	For(n=0;n<CountObjectsDFR(dfr,1);n+=1)
-		wave wv=$GetIndexedObjNameDFR(dfr, 1, n)
-		//do what you want here
-	endfor			
+Function/s FolderListGet(dfr,matchstr)
+// returns an alphabetical list of folder names located in datafolder reference dfr with
+// a name matching matchstr; matchstr="*" for all folders"
+	DFREF dfr
+	string matchstr
+	string fldlist=""
+	variable i
+	for (i=0;i<countobjectsdfr(dfr, 4);i+=1)
+		string folder=GetIndexedObjNameDFR(dfr, 4, i )
+		if(stringmatch(folder,matchstr)==1)
+			fldlist=addlistitem(folder,fldlist, ";")
+		endif
+	endfor
+	fldlist=sortlist(fldlist,";",16)
+	return fldlist 
+End
+
+/////////////// 	---	Folder Panel  ---   //////////////////////////////////
+Function ChangeFolder_Panel()
+	if(WinType("ChangeFolderPanel")!=7)
+		ChangeFolderPanel_Variables()
+		ChangeFolderPanel_Setup() 
+	else
+		dowindow/f ChangeFolderPanel
+	endif
 end
+Function ChangeFolderPanel_Variables()
+	DFREF saveDFR = GetDataFolderDFR()
+	NewDataFolder/o/s root:ChangeFolderPanel
+	DFREF dfr=root:ChangeFolderPanel
+	string/g dfr:parentDF, dfr:fldname, dfr:fldlist
+	svar parentDF=dfr:parentDF, fldlist=dfr:fldlist, fldname=dfr:fldname
+	parentDF=Getdatafolder(1)
+	DFREF parentDFR=$parentDF
+	fldlist=FolderListGet(parentDFR,"*")
+	fldname=stringfromlist(0,fldname,";")
+End
+Function ChangeFolderPanel_Setup()
+	DFREF dfr=root:ChangeFolderPanel
+	svar fldlist=dfr:fldlist, fldname=dfr:fldname
+	NewPanel /W=(514,454,779,535) 
+	DoWindow/C/T/R ChangeFolderPanel,"ChangeFolderPanel"
+	setwindow ChangeFolderPanel, hook(cursorhook)=ChangeFolderPanel_Hook, hookevents=3, hook=$""
+	ModifyPanel cbRGB=(1,52428,52428)
+	SetVariable ParentFolder pos={8,8},size={200,20},limits={-inf,inf,0},title="Parent Folder:"
+	SetVariable ParentFolder,proc=ChangeFolderPanel_PopFolderList//, value= #("root:ChangeFolderPanel:ParentDF") 
+	PopupMenu popupFolderList,pos={8,38},size={95,20},proc=ChangeFolderPanel_PopFolderList,title="Folder:"
+	PopupMenu popupFolderList,mode=1,popvalue="---",value= #("root:ChangeFolderPanel:fldlist") 	
+	Button buttonF title=">",pos={200,37},size={15,20},proc=ChangeFolderPanel_ButtonProcs
+	Button buttonR title="<",pos={180,37},size={15,20},proc=ChangeFolderPanel_ButtonProcs
+End
+Function ChangeFolderPanel_PopFolderList(pa) : PopupMenuControl
+	STRUCT WMPopupAction &pa
+	pa.blockReentry = 1
+	DFREF dfr=root:ChangeFolderPanel
+	svar fldlist=dfr:fldlist, fldname=dfr:fldname,parentDF=dfr:parentDF
+	
+	DFREF parentDFR = $parentDF
+	fldlist=FolderListGet(parentDFR,"*")
+	Variable popNum = pa.popNum
+	String popStr = pa.popStr
+	fldname=popStr
+	PopupMenu popupFolderList popvalue=popStr
+//	print parentDF,fldname
+///
+	SetDataFolder  $(parentDF+fldname)
+	return 0
+End
+Function ChangeFolderPanel_ButtonProcs(B_Struct) : ButtonControl
+	STRUCT WMButtonAction &B_Struct
+	DFREF dfr=root:ChangeFolderPanel
+	svar fldlist=dfr:fldlist, fldname=dfr:fldname
+	variable which=whichlistitem(fldname,fldlist,";")
+	Switch(B_Struct.eventCode)
+		case 2: 		//Mouse up
+			variable i
+			strSwitch(B_Struct.ctrlName)
+				case "buttonF":
+					i=1
+					break
+				case  "buttonR":
+					i=-1
+					break
+			endswitch	
+			if((which+i)>itemsinlist(fldlist,";"))
+				which=0
+			elseif((which+i)<0)
+				which=itemsinlist(fldlist,";")
+			else
+				which=which+i
+			endif
+			fldname=stringfromlist(which,fldlist,";")
+			STRUCT WMPopupAction pa
+			pa.ctrlName="popupFolderList"
+			pa.popStr=fldname
+			pa.popNum=which
+			ChangeFolderPanel_PopFolderList(pa)
+			 PopupMenu popupFolderList,mode=1,popvalue=fldname//,value=fldlist 
+		break
+	endswitch
+End
+
+
+Function ChangeFolderPanel_Hook(H_Struct)
+	STRUCT WMWinHookStruct &H_Struct
+	variable eventCode = H_Struct.eventCode
+	string dfn=H_Struct.winName; string df="root:"+dfn+":"
+	if(eventcode==2)
+		dowindow /F $dfn
+		JLM_FileLoaderModule#killallinfolder(df)
+		killdatafolder $df
+		return(-1)
+	elseif(eventcode==3)
+		FolderListGet(root:ChangeFolderPanel,"*")
+	endif
+end
+End
 
 /////////////////////////////////////////////////////////////////////////
 //////////////////////////Vectorization////////////////////////////////////
@@ -290,6 +399,42 @@ Function FitFermiGraph()
 		print "FitFermi1D("+NameofWave(wv)+","+num2str(x1)+","+num2str(x2)+")"
 	endif
 End
+
+Function DivideFermiFunction_Dialog()
+	string wvname, wvcoef
+	variable Edim
+	Prompt wvname, "Data wave:", popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")+"; -- 1D --;"+WaveList("!*_CT",";","DIMS:1")
+	Prompt wvcoef, "Fit coeffients:", popup, WaveList("*EF_coef",";","DIMS:1")+";"+WaveList("!*_CT",";","DIMS:1")
+	Prompt Edim, "Dimension of energy axis"
+	DoPrompt "Divide by Fermi function", wvname, wvcoef, Edim
+	wave EF_coef=$wvcoef
+	if(v_flag==0)
+		Wave wv=$wvname
+		DivideFermiFunction(wv,Edim,EF_coef[0],EF_coef[1],EF_coef[2],EF_coef[3],EF_coef[4])
+		print "DivideFermiFunction("+wvname+","+num2str(EF_coef[0])+","+num2str(EF_coef[1])+","+num2str(EF_coef[2])+","+num2str(EF_coef[3])+","+num2str(EF_coef[4])+")"
+	endif
+End
+
+Function DivideFermiFunction(wv,Edim,Ef,Ew,Af,y0,Ay)
+	wave wv
+	variable Edim,Ef,Ew,Af,y0,Ay
+	duplicate/o wv $(nameofwave(wv)+"_Ediv")
+	wave wv_E=$(nameofwave(wv)+"_Ediv")
+	make/o/n=(dimsize(wv,Edim)) Fermi
+	wave Fermi
+	Fermi=y0+Ay*(x-Ef)*((x-Ef)<0)+Af*0.5*erfc((x-Ef)/(Ew/1.66511)) 	//G_step
+	switch (wavedims(wv))
+		case 1:
+			break
+		case 2:
+			break
+		case 3:
+			break
+		case 4:
+			break
+	endswitch
+End
+
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////// Normalize XPS, XAS /////////////////////////////
 /////////////////////////////////////////////////////////////////////////
