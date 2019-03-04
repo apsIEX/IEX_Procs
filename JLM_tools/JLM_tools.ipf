@@ -229,7 +229,7 @@ Function Histogram_img2D(npx, npy, img_v, img_vx, img_vy) //make and image
 	endfor
 	img_hist/=img_norm
 end
-Function VectorCrossProduct(a,b)
+Function/wave VectorCrossProduct(a,b)
 	Wave a, b
 	if (dimsize(a,0)==3&&dimsize(b,0)==3&&wavedims(a)==1&&wavedims(b)==1)
 		make/n=3/o tempc
