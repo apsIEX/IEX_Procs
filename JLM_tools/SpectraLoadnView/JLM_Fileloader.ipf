@@ -36,10 +36,10 @@ function LoaderPanelVariables()
 	string dfn="LoaderPanel", df="root:"+dfn+":"
 	NewDataFolder/o/s root:LoaderPanel
 	string/g filepath, filename, filelist, nfile, folderList, LPext,  datatype, datatypelist,wvdf, loadedwvlist
-	variable/g filenum,checkBE_KE
+	variable/g filenum,checkBE_KE, checkTransImg
 	svar filepath=$(df+"filepath"), filename=$(df+"filename"), filelist=$(df+"filelist"), nfile=$(df+"nfile"), folderList=$(df+"folderList")
 	svar datatypelist=$(df+"datatypelist"), datatype=$(df+"datatype"), wvdf=$(df+"wvdf"), loadedwvlist=$(df+"loadedwvlist")
-	nvar filenum=$(df+"filenum"), checkBE_KE=$(df+"checkBE_KE")
+	nvar filenum=$(df+"filenum"), checkBE_KE=$(df+"checkBE_KE"),checkTransImg=$(df+"checkTransImg")
 	make/o/w/u $(df+"filecolors")
 	wave  filecolors= $(df+"filecolors") 
 	filecolors={{0,0,0},{0,0,0},{0,0,65535},{65535,0,0}}
@@ -53,6 +53,7 @@ function LoaderPanelVariables()
 	datatypelist="MDA;Igor Binary;General Text;Spec;MDAascii;Tiff;NetCDF;MPA" ///edit to include other data types
 	datatype="MDA" ////change default time here
 	wvdf="root:"
+	checkTransImg=1
 end
 
 Function LoaderPanelSetup() 
@@ -96,6 +97,8 @@ Function LoaderPanelSetup()
 	//Variables
 	CheckBox checkbox_KE_BE, title="BE", pos={342,75},size={30,15},variable=root:LoaderPanel:checkBE_KE,disable=1
 	CheckBox checkbox_KE_BE, help={"Check for scaling data to be in binding energy"}
+	CheckBox checkbox_TransImg title="Avg Transmission",pos={220,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkTransImg,disable=0
+	CheckBox checkbox_TransImg, help={"UnCheck to load transimssion data as image"}
 end
 
 Function LoaderSelectFilter(ctrlName,varNum,varStr,varName) : SetVariableControl
@@ -213,13 +216,23 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break	
+		case "Igor Experiment":
+			LPext="*.pxp"
+			Button LoadButton title="Load",  disable=0
+			Button LoadAllButton  title="Load All",  disable=0
+			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
+		break
 		case "General Text":
 			LPext="*.txt"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton  title="Load All",  disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break
 		case "Spec":
 			LPext="*.*"
@@ -227,6 +240,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load Experiment",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break
 		case "MDAascii":
 			LPext="*.asc"
@@ -234,6 +248,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break	
 		case "MDA":
 			LPext="*.mda"
@@ -241,6 +256,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break
 		case "Tiff":
 			LPext="*.tif"
@@ -248,12 +264,14 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =0
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break
 		case "NetCDF":
 			LPext="*.nc"
 			Button LoadButton title="Load",  disable=0
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=0
 			CheckBox checkbox_KE_BE, disable=0
 		break
 		case "MPA":
@@ -262,6 +280,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
+			CheckBox checkbox_KE_BE, disable=0
 		break
 	endswitch
 	LoaderUpdateFilesLB(ctrlName)
@@ -499,6 +518,9 @@ Function/S LoaderLoadFile(df, ctrlName)
 			loadwave/o/g/n=$wname/p=LoadPath filename
 			loadedwv=s_WaveNames
 		break	
+		case "Igor Experiment":
+			LoadIgorBinary(filename)
+		break
 		case "Igor Binary":
 			loadedwv=LoadIgorBinary(filename)
 		break
@@ -559,6 +581,7 @@ Function/S  LoadIgorBinary(filename)
 	Redimension/S $wvname
 	return  S_waveNames
 End
+
 //////////////////////////////////Load single scan from Spec//////////////////////////////////////
 Function/s LoadScanfromSpec(df)
 	string df
@@ -1265,11 +1288,11 @@ Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "Wave note tools"	
 			Submenu "MDA Tools"
-				"MDA Extra PVs panel",mdaKey_Panel()
-				"MDA Extra PV to wave", ExtraPV2waveDialog()
 				"MDA Extra PVs -- list all", ExtraPVnotebook()
-				"MDA Extra PV value",  "ExtraPVva(\"pv\") or ExtraPVstr(\"df\",\"pv\")"
-				"MDA Summarize all loaded folders",ExtraPVSummarizeMDAFolders("X29id*")
+				"MDA keyword search", print "ExtraPVstrList(\"pv\")"
+				"MDA Extra PV val", print "ExtraPVva(\"pv\")"
+				"MDA Extra PV to wave", ExtraPV2waveDialog()
+				"MDA Summarize all loaded folders",MDA_MakeSummary()
 				"MDA Tools Help", MDAToolsHelp()
 			end
 		end
@@ -1353,45 +1376,76 @@ Function ExtraPV2waveDialog()
 		ExtraPVs2wave(pv, GetWavesDataFolder(dest_wv,2), basename,suffix,GetWavesDataFolder(scannum_wv,2))
 		endif
 end
-Function ExtraPVSummarizeMDAFolders(matchstr)
-	string matchstr
-	DFREF dfr = GetDataFolderDFR()
-	string fldlist=FolderListGet(dfr,matchstr)
+Function MDA_MakeSummary()
+	setdatafolder root:
+	string basename="mda_", suffix=""
 	variable i,j
-	for(i=0;i<itemsinlist(fldlist,";");i+=1)
-		dfref fldref=:$stringfromlist(i,fldlist)
-		wave wv=fldref:$GetIndexedObjNameDFR(fldref,1,0)
-		//Make Summary Wave
-		if(i==0)
-			string pvlist=mdaPanel_ExtraPVList(stringfromlist(i,fldlist))
-			string pvdesclist=mdaPanel_ExtraPVDescriptorList(stringfromlist(i,fldlist))
-			Make/o/T/n=(itemsinlist(fldlist,";")+1,itemsinlist(pvlist,";")+1) mda_Summary
-			wave/T mda_Summary
-			mda_Summary[0][0]="file"
-			//Make header for summary wave
-			for(j=0;j<itemsinlist(pvlist,";");j+=1)
-				wave/T mda_Summary
-				mda_Summary[0][j+1]=stringfromlist(j,pvlist,";")+";"+stringfromlist(j,pvdesclist,";")
-			endfor
-		endif
-		//Fill in Extra PV values for a given folder
+	// Data folder list //
+	DFREF dfr = GetDataFolderDFR()
+	string df="root:mdaSummary:"
+	newdatafolder/o root:mdaSummary
+	string folder="", folderlist=""
+	for (i=0;i<countobjectsdfr(dfr, 4);i+=1)
+		folder=GetIndexedObjNameDFR(dfr, 4, i )
+		folderlist=addlistitem(folder,folderlist, ";")
+	endfor
+	folderlist=sortlist(folderlist,";",16)
+	folderlist=JLM_FileLoaderModule#ReduceList(folderlist, basename+"*" ) 
+	folderlist=JLM_FileLoaderModule#ReduceList(folderlist,"*"+suffix)
+	//Extra PV info//
+	setdatafolder $stringfromlist(0,folderlist,";")
+	wave wv=$(GetIndexedObjName("", 1, 0))
+	string buffer=note(wv)
+	string PVlist=""
+	//Make Extra PV waves
+	For (i=0;i<itemsinlist(buffer,";");i+=1)
+			string tmp=stringfromlist(i,buffer,";")
+			tmp=stringfromlist(0,tmp,",")
+			tmp=tmp[strsearch(tmp,":",0)+2,inf] //get PV name from ExtraPVs
+			//testing is extra pv is string or variable 
+			string extrapv=ExtraPVstrList(tmp)
+			string valstr=stringfromlist(2,extrapv,",")
+			valstr=valstr[2,strlen(valstr)-2]
+			if(numtype(strlen(valstr))==0) //pv not an empty string
+				pvlist=addlistitem(tmp,pvlist, ";")
+	 			variable val=str2num(valstr[2,strlen(valstr)-2])
+				if(numtype(val)==2)
+					make/t/o/n=(itemsinlist(folderlist,";"))  $(df+cleanupname(tmp,0))
+				elseif(numtype(val)==0)
+					make/o/n=(itemsinlist(folderlist,";"))  $(df+cleanupname(tmp,0))
+				endif
+			endif
+	endfor	
+	// Make Summary Waves
+	make/o/T/n=(itemsinlist(folderlist,";")) $(df+"Scan_Name")
+	wave/T Scan_Name=$(df+"Scan_Name")
+	//Fill in Tables
+	for(i=0;i<itemsinlist(folderlist,";");i+=1)
+		Scan_Name[i]=stringfromlist(i,folderlist,";")
+		setdatafolder dfr
+		setdatafolder $(stringfromlist(i,folderlist,";"))
 		for(j=0;j<itemsinlist(pvlist,";");j+=1)
-			wave/T mda_Summary
-			mda_Summary[i+1][0]=GetWavesDataFolder(wv, 0 )
-			string pv=stringfromlist(j,pvlist,";")
-			string valstr=ExtraPVstr(GetWavesDataFolder(wv, 1 ),pv)
-			mda_Summary[i+1][j+1]=valstr
+			//wave wv=$(df+cleanupname(stringfromlist(j,pvlist),0))
+			//wv[i]=ExtraPVval(stringfromlist(j,pvlist))
+			//testing is extra pv is string or variable 
+			tmp=stringfromlist(j,pvlist)
+			extrapv=ExtraPVstrList(tmp)
+			valstr=stringfromlist(2,extrapv,",")
+			valstr=valstr[2,strlen(valstr)-2]
+			if(numtype(strlen(valstr))==0)  //pv not an empty string
+	 			val=str2num(valstr[2,strlen(valstr)])
+				if(numtype(val)==2)
+					wave/t wvt=$(df+cleanupname(stringfromlist(j,pvlist),0))
+					wvt[i]=valstr
+				elseif(numtype(val)==0)
+					wave wv=$(df+cleanupname(stringfromlist(j,pvlist),0))
+					wv[i]=str2num(valstr)
+				endif
+			endif
 		endfor
 	endfor
-	//Brings table of wave to front or displays is not already existing
-	Dowindow mda_Summary
-	if(v_flag==1)
-		Dowindow/F mda_Summary
-	else
-		Edit/K=0 root:mda_Summary
-	endif
-End
-
+	setdatafolder dfr
+end	
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////		mda Panel		//////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1533,21 +1587,6 @@ Function/s mdaPanel_ExtraPVList(fldname)
 	for(i=10;i<itemsinlist(tmp,";");i+=1)
 		string PV=stringfromlist(i,tmp,";")
 		PV=PV[strsearch(PV,":",0)+2,strsearch(PV,",",0)-1]
-		ExtraPVList=addlistitem(PV,ExtraPVList, ";")
-	endfor
-	setdatafolder root:
-	return ExtraPVList
-end
-Function/s mdaPanel_ExtraPVDescriptorList(fldname)
-	string fldname
-	setdatafolder $("root:"+fldname+":")
-	wave wv=$GetIndexedObjName("root:"+fldname+":", 1, 0)
-	string tmp=note(wv)
-	string ExtraPVList=""
-	variable i
-	for(i=10;i<itemsinlist(tmp,";");i+=1)
-		string PV=stringfromlist(i,tmp,";")
-		PV=stringfromlist(1,PV,",")
 		ExtraPVList=addlistitem(PV,ExtraPVList, ";")
 	endfor
 	setdatafolder root:
@@ -1821,8 +1860,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	string dfn=getdatafolder(0)
 	wave nc_Attr_DetectorMode,nc_Attr_AcquisitionMode, nc_Attr_LensMode
 	wave nc_Attr_LowEnergy, nc_Attr_HighEnergy, nc_Attr_ActualPhotonEnergy, nc_Attr_EnergyStep, nc_Attr_EnergyStep_RBV
-	wave nc_Attr_EnergyStep_Fixed_RBV, nc_Attr_EnergyStep_Swept, nc_Attr_EnergyStep_Swept_RBV
-
+	wave nc_Attr_EnergyStep_Fixed,nc_Attr_EnergyStep_Fixed_RBV, nc_Attr_EnergyStep_Swept, nc_Attr_EnergyStep_Swept_RBV
 	wave nc_Attr_PassEnergy
 	wave nc_Attr_FirstChannel
 	wave nc_Attr_CentreEnergy_RBV
@@ -1869,12 +1907,17 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 //	print DegPerChannel
 	If(LensMode==0)
 		// Transmission
-			string opt="/X/D=root:"+dfn+"avgy"
-			JLM_FileLoaderModule#ImgAvg(wv,opt)
-			wave avg=$("root:"+dfn+"avgy")
-			note avg Note(wv)
-			killwaves wv
-			SetScale/p x, Estart,Edelta,Eunits,avg
+			nvar checkTransImg=root:LoaderPanel:checkTransImg
+			if (checkTransImg==1)
+				string opt="/X/D=root:"+dfn+"avgy"
+				JLM_FileLoaderModule#ImgAvg(wv,opt)
+				wave avg=$("root:"+dfn+"avgy")
+				note avg Note(wv)
+				killwaves wv
+				SetScale/p x, Estart,Edelta,Eunits,avg
+			else
+				SetScale/p x, Estart,Edelta,Eunits,wv
+		endif
 	Else //Angular Mode
 		variable CenterChannel=571
 		variable FirstChannel
@@ -1914,16 +1957,16 @@ Function IEX_SetEnergyScale_Dialog()
 	Prompt Emodestr, "Energy Scale", popup, "Binding Energy; Kinetic Energy"
 	Prompt Edimstr, "Energy Dimension:", popup, "x;y;z;t"
 	Prompt Wk, "Work Function"
-	DoPrompt "Set netCDF SES Energy Scale"wvname,Emodestr,Edimstr,WK
+	DoPrompt "Set netCDF SES Energy Scale",wvname,Emodestr,Edimstr,WK
 	variable Emode,Edim
 	Emode=SelectNumber(cmpstr(Emodestr,"Binding Energy"),0,1)
 	Edim=SelectNumber(cmpstr(Edimstr,"t"),3,1+cmpstr(Edimstr,"y")) //dim from  popup list
 	if (v_flag==0)
-		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Edim)+","+num2str(Emode)+","+num2str(Wk)+")"	
-		IEX_SetEnergyScale(wvname,Edim,Emode,Wk)
+		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+","+num2str(Wk)+")"	
+		IEX_SetEnergyScale(wvname,Emode,Edim,Wk)
 	endif
 end
-Function IEX_SetEnergyScale(wvname,Edim,Emode,Wk)
+Function IEX_SetEnergyScale(wvname,Emode,Edim, Wk)
 	string wvname
 	variable Emode	// BE=0,KE=1
 	variable Edim, Wk
@@ -1978,20 +2021,19 @@ Function IEX_SetAngleScale(wvname,Adim,Aunits,A0)
 	variable Aoffset=dimoffset($wvname,Adim)	
 	Switch (Adim)
 		case 0:
-			//SetScale/p x, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname		
-			SetScale/p x, Aoffset-A0,Astep,Aunits,$wvname		
+			SetScale/p x, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
 			break
 		case 1:
-			SetScale/p y, Aoffset-A0,Astep,Aunits,$wvname			
+			SetScale/p y, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
 			break
 		case 2:
-			SetScale/p z, Aoffset-A0,Astep,Aunits,$wvname			
+			SetScale/p z, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
 			break
 		case 3:
-			SetScale/p t, Aoffset-A0,Astep,Aunits,$wvname			
+			SetScale/p t, Aoffset-sign(Astep)*A0,Astep,Aunits,$wvname			
 			break
 		Endswitch	
-	print "dimoffset("+wvname+","+num2str(Adim)+")  "+num2str(Aoffset)+"  =>  "+num2str(Aoffset-A0) 	
+	print "dimoffset("+wvname+","+num2str(Adim)+")  "+num2str(Aoffset)+"  =>  "+num2str(Aoffset+A0) 	
 End
 
 //Dither Procedures
@@ -2447,7 +2489,7 @@ Static Function/s Num2Str_SetLen(num,ndigits) //Make a string of a set character
 	if(strlen(zeros)>ndigits)
 	//	print "number is greater than number of digits"
 	elseif(strlen(zeros)<ndigits)
-		str=zeros[0,strlen(zeros)-floor(log(num))]+num2istr(num)
+		str=zeros[0,strlen(zeros)-floor(log(num))]+num2str(num)
 	endif
 	return str
 end

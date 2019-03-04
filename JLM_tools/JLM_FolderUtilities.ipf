@@ -13,6 +13,7 @@ Menu "APS Procs"
 		"Stack waves from ScanNum wave", StackWaves_Dialog()
 		"Stack waves first, last", StackWavesfromFirstLast_Dialog()
 		"Move waves to DataFolder",MakeDFnMoveWaves_Dialog()
+		"Move folders into DataFolder",MakeDFnMoveFolder_Dialog()
 		 "Average waves first, last", AverageWaves_FirstLast_Dialog()
 		"Kill DataFolders - first, last",KillDataFolder_FirstLast_Dialog()
 		"Kill Waves - first, last",Killwaves_FirstLast_Dialog()
@@ -461,7 +462,3 @@ Function MakeDFnMoveWaves(first,last, basename, suffix,dfn,stackfldr)
 		stackallinfolder()
 	endif
 end
-
-	string df=getdf()
-	svar dname=$(df+"dname")
-	setupV(getdfname(),dname)

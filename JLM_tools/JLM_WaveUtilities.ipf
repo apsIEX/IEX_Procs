@@ -24,7 +24,7 @@ Function/s Num2Str_SetLen(num,ndigits) //Make a string of a set character length
 	if(strlen(zeros)>ndigits)
 	//	print "number is greater than number of digits"
 	elseif(strlen(zeros)<ndigits)
-		str=zeros[0,strlen(zeros)-floor(log(num))]+num2istr(num)
+		str=zeros[0,strlen(zeros)-floor(log(num))]+num2str(num)
 	endif
 	return str
 end

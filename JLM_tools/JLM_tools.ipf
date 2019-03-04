@@ -17,6 +17,19 @@ Menu "APS Procs"
 end
 
 /////////////////////////////////////////////////////////////////////////
+///////////////Folder management Template //////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+Function ExecuteToAllinFolder()
+	variable n
+	DFREF dfr=getdatafolderDFR()
+	For(n=0;n<CountObjectsDFR(dfr,1);n+=1)
+		wave wv=$GetIndexedObjNameDFR(dfr, 1, n)
+		//do what you want here
+	endfor			
+end
+
+
+/////////////////////////////////////////////////////////////////////////
 ///////////////		Folder Procedures		 ////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 Function/s FolderListGet(dfr,matchstr)
@@ -263,20 +276,6 @@ Function hv_kzn(n,th,c,V0)
 	hv=((n*2*pi/c/0.5124)^2-V0)/cosd(th)
 	return hv
 end
-
-
-Function Calc_V0(KE2,th2,chi2,KE1,th1,chi1,a,m,n)
-	variable m,KE2,th2,chi2,n,KE1,th1,chi1,a
-	variable astar=2*pi/a
-	th2=th2/180*pi
-	chi2=chi2/180*pi
-	th1=th1/180*pi
-	chi1=chi1/180*pi
-	variable V0
-	variable c=0.5124
-	V0=0.5*(astar/c)^2*(m^2+n^2)-0.5*(KE2*cos(th2)^2*cos(chi2)^2+KE1*cos(th1)^2*cos(chi1)^2)
-	return V0
-End
 
 Function Calc_kz_n(KE2,th2,chi2,KE1,th1,chi1,a)	//assumes at kz2=(n+1)*astar; kz2=n*astar
 	variable KE2,th2,chi2,KE1,th1,chi1,a

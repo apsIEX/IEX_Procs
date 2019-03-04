@@ -10,6 +10,7 @@ Menu "APS Procs"
 		"Duplicate window size",  DupWinSize_Dialog()
 		"----------------"
 		"Graph all waves in DataFolder",GraphAllWavesinFolder()
+		"Graph all waves in SubFolders", print "GraphAllWavesinFolder_subfolder(ywvname,xwvname)"
 		"----------------"
 		"Add DataFolder to legend",LedgendwithFolders()
 		"Title = Top Image Folder",Image_FolderinTitle()
@@ -20,6 +21,8 @@ Menu "APS Procs"
 		"Average Image", ImgAvg_dialog()	
 		"Integrate image", Integrate2Dli()	
 		"Crop Image", Crop_xy_Dialog()
+		"----------------"
+		"Color all traces from wave ina given datafolder",print "ColorbyDataFolder(dfn,R,G,B)"
 		
 	end
 End
@@ -58,6 +61,21 @@ Function CopyWaveColors(Graph_Source,Graph_Copy)
 	String Tlist_Source, Tlist_Copy
 	String ColorList_Source, ColorList_Copy
 End
+
+Function ColorbyDataFolder(dfn,R,G,B)
+	string dfn
+	variable R,G,B
+	variable i
+	For(i=0;i<itemsinlist(TraceNameList("",";",1),";");i+=1)
+		string tname=stringfromlist(i,TraceNameList("",";",1),";")
+		wave wv=TraceNameToWaveRef("", tname)
+		string fld=GetwavesDataFolder(wv,1)
+		variable val=FindListItem(dfn,fld,":",0,0)
+		if (val>-1)
+			ModifyGraph rgb($tname)=(r,g,b)
+		endif
+	endfor
+end
 
 //////////////////////////////////////////////////////
 ////////////////// ---Legend --- //////////////////////
@@ -180,6 +198,27 @@ Function GraphAllWavesinFolder()
 	movewindow 585,150,1085,550
 	ModifyGraph margin(right)=180
 end
+
+Function GraphAllWavesinSubFolder(ywvname,xwvname)
+	string ywvname, xwvname
+	display
+	DFREF dfr=getdatafolderDFR()
+	variable i
+	For(i=0;i<CountObjectsDFR(dfr,4);i+=1)
+		string fld=GetIndexedObjNameDFR(dfr, 4, i)
+		setdatafolder $fld
+		DFREF fldr=getdatafolderDFR()
+		Wave/SDFR=fldr xwv=$xwvname
+		Wave/SDFR=fldr ywv=$ywvname	
+		appendtograph ywv vs xwv
+		setdatafolder dfr
+	endfor	
+	
+	LedgendwithFolders()
+	movewindow 585,150,1085,550
+	ModifyGraph margin(right)=180
+end
+
 /////////////////////////////////////////////////////////////////////////
 ///////////////////////////Average Image///////////////////////////	
 /////////////////////////////////////////////////////////////////////////
