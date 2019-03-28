@@ -97,6 +97,7 @@ Function LoaderPanelSetup()
 	//Variables
 	CheckBox checkbox_KE_BE, title="BE", pos={342,75},size={30,15},variable=root:LoaderPanel:checkBE_KE,disable=1
 	CheckBox checkbox_KE_BE, help={"Check for scaling data to be in binding energy"}
+	
 	CheckBox checkbox_TransImg title="Avg Transmission",pos={220,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkTransImg,disable=0
 	CheckBox checkbox_TransImg, help={"UnCheck to load transimssion data as image"}
 end
@@ -2200,7 +2201,6 @@ Function ncNote2waveDialog()
 		print "ncNote2wave(\""+pv+"\",\""+GetWavesDataFolder(dest_wv,2)+"\",\""+basename+"\",\""+suffix+"\",\""+GetWavesDataFolder(scannum_wv,2)+"\")"
 		ncNote2wave(pv, GetWavesDataFolder(dest_wv,2), basename,suffix,GetWavesDataFolder(scannum_wv,2))
 	endif
-
 end
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////		nc Panel		//////////////////////////////////////////////////////////////////////////////////
@@ -2235,7 +2235,7 @@ Function ncKeyPanel_Setup()
 	string dfn="ncKeyPanel", df="root:"+dfn+":"
 	svar key=$(df+"key"), wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
 	svar val=$(df+"val")
-	NewPanel /W=(514,454,779,535) 
+	NewPanel /W=(514,454,826,537)
 	DoWindow/C/T/R $dfn,dfn
 	setwindow $dfn, hook(cursorhook)=ncKeyPanel_Hook, hookevents=3, hook=$""
 	ModifyPanel cbRGB=(1,52428,52428)
@@ -2249,23 +2249,34 @@ Function ncKeyPanel_Setup()
 	SetVariable setvarVal,limits={-inf,inf,0},value= root:ncKeyPanel:val
 	Button buttonF title=">",pos={200,7},size={15,20},proc=ncKeyPanel_ButtonProcs
 	Button buttonR title="<",pos={180,7},size={15,20},proc=ncKeyPanel_ButtonProcs
+	Button buttonStackWavesbyKey title="=> wv",pos={255,31},size={50,20},proc=ncKeyPanel_ButtonProcs
 	SetDataFolder saveDFR
 end
-Function ncKeyPanel_ButtonProcs_backup(B_Struct) : ButtonControl
+Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
 	STRUCT WMButtonAction &B_Struct
 	string dfn="ncKeyPanel", df="root:"+dfn+":"
 	svar wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
 	variable which=whichlistitem(wvname,wvlist,";")
+	variable i
 	Switch(B_Struct.eventCode)
+
 		case 2: 		//Mouse up
-			variable i
+			variable j=0
+			string but= B_Struct.ctrlName	
 			strSwitch(B_Struct.ctrlName)
+				print but
 				case "buttonF":
 					i=1
 					break
 				case  "buttonR":
 					i=-1
 					break
+				case "buttonStackWavesbyKey":
+					i=0
+					wave wv=$wvname
+					svar key=$(df+"key")
+					ncPanel_StackWavesbyKey_Dialog(key)
+					break
 			endswitch	
 			if((which+i)>itemsinlist(wvlist,";"))
 				which=0
@@ -2285,48 +2296,7 @@ Function ncKeyPanel_ButtonProcs_backup(B_Struct) : ButtonControl
 		break
 	endswitch
 End
-Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
-	STRUCT WMButtonAction &B_Struct
-	string dfn="ncKeyPanel", df="root:"+dfn+":"
-	svar wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
-	variable which=whichlistitem(wvname,wvlist,";")
-	Switch(B_Struct.eventCode)
-		case 2: 		//Mouse up
-		variable i=0
-		StrSwitch(B_Struct.ctrlName)
-			case "buttonF":
-				i=1
-				break
-			case  "buttonR":
-				i=-1
-				break
-			case "buttonCMDline":
-				svar key=$(df+"key")
-				string pv="\r"+key
-				string  keysep=":",listsep=";"
-				print "WavenoteKeyVal("+wvname+","+pv+","+keysep+","+listsep+")" 	
-				break
-			break
-			endswitch	
-			//Folder advance
-			if((which+i)>itemsinlist(wvlist,";"))
-				which=0
-			elseif((which+i)<0)
-				which=itemsinlist(wvlist,";")
-			else
-				which=i+which
-			endif
-			wvname=stringfromlist(which,wvlist,";")
-			STRUCT WMPopupAction pa
-			pa.ctrlName="popupFolderList"
-			pa.popStr=wvname
-			pa.popNum=which
-			pa.eventCode=2
-			ncKeyPanel_PopMenuWaveList(pa)
-			 PopupMenu popupWaveList,mode=1,popvalue=wvname//,value=fldlist 
-		break
-	endswitch
-End
+
 Function ncKeyPanel_PopMenuAttrList(ctrlName,popNum,popStr) : PopupMenuControl
 	String ctrlName
 	Variable popNum	// which item is currently selected (1-based)
@@ -2429,7 +2399,37 @@ end
 
 end
 
+Function ncPanel_StackWavesbyKey_Dialog(key)
+	string key
+	variable first,last
+	string basename="EA_",suffix="",StackName="Stack",pvshort="pv"
+	prompt first, "First:"
+	prompt last, "Last:"
+	prompt basename,"Basename:"
+	prompt suffix, "Suffix:"
+	prompt StackName,"Name of stacked wave:"
+	prompt pvshort, "suffix for pv wave e.g. hv"
+	doprompt  "Stackwave by pv value",first,last,basename,suffix,StackName,pvshort
+	if (v_flag==0)
+		print "ncPanel_StackWavesbyKey("+num2str(first)+","+num2str(last)+",\""+key+"\",\""+basename+"\",\""+suffix+"\",\""+StackName+"\",\""+pvshort+"\")"
+		ncPanel_StackWavesbyKey(first,last,key,basename,suffix,StackName,pvshort)
+	endif
+end
+	
 
+Function ncPanel_StackWavesbyKey(first,last,key,basename,suffix,StackName,pvshort)
+	variable first,last
+	string key,basename,suffix,StackName,pvshort
+	//Making ScanNum and pv waves
+	make/o/n=(floor(last-first+1)), $(StackName+"_ScanNum"),$(StackName+"_"+pvshort)
+	wave wv_ScanNum=$(StackName+"_ScanNum")
+	wave wv_key=$(StackName+"_"+pvshort)
+	wv_ScanNum=first+p
+	ncNote2wave(key,GetWavesDataFolder(wv_key,2), basename,suffix,GetWavesDataFolder(wv_ScanNum,2))
+	//Sort by pv_values
+	sort wv_key, wv_ScanNum, wv_key
+	StackWavesfromListWave(wv_ScanNum, basename,suffix,StackName)
+End
 
 
 //=================== Wave and Folder Name Procedures ===================
@@ -2518,23 +2518,6 @@ Static Function/s FolderNamewithNum(basename,scannum,suffix)
 	endfor
 
 end
-Static Function/s FolderListGet(dfr,matchstr)
-// returns an alphabetical list of folder names located in datafolder reference dfr with
-// a name matching matchstr; matchstr="*" for all folders"
-	DFREF dfr
-	string matchstr
-	string fldlist=""
-	variable i
-	for (i=0;i<countobjectsdfr(dfr, 4);i+=1)
-		string folder=GetIndexedObjNameDFR(dfr, 4, i )
-		if(stringmatch(folder,matchstr)==1)
-			fldlist=addlistitem(folder,fldlist, ";")
-		endif
-	endfor
-	fldlist=sortlist(fldlist,";",16)
-	return fldlist 
-
-End
 //=================== Wave note Procedures ===================
 //netcdf: key="/r....", keysp=":", listsep=";"
 Static Function WavenoteKeyVal(wvname,key,keysep,listsep)
