@@ -30,7 +30,7 @@ Function Killwaves_FirstLast_Dialog()
 	Prompt first, "first"
 	Prompt last, "last"
 	DoPrompt "Kills a series of waves based on the wavename = basename+num+suffix", basename, suffix, first, last
-	Print "Killwaves_FirstLast(\""+basename+"\",\""+suffix+"\","+num2str(first)+","+num2str(last)+")"
+	Print "Killwaves_FirstLast("+basename+","+suffix+","+num2str(first)+","+num2str(last)+")"
 	 Killwaves_FirstLast(basename, suffix,first, last)
 end
 Function Killwaves_FirstLast(basename, suffix,first, last)
@@ -190,7 +190,6 @@ end
 Function StackAllinFolder()
 	variable n
 	DFREF dfr=getdatafolderDFR()
-	string StackList=""
 	For(n=0;n<CountObjectsDFR(dfr,1);n+=1)
 		wave wv=$GetIndexedObjNameDFR(dfr, 1, n)
 		if(n==0)
@@ -219,10 +218,8 @@ Function StackAllinFolder()
 				wv_stack[][][][n]=wv[p][q][r]
 				break
 		endswitch
-		Stacklist=addlistitem(NameofWave(wv),Stacklist)
 	endfor	
-	Note wv_stack, "WavesStacked:"+Stacklist+"\r"
-	setdatafolder root:		
+	setdatafolder root:
 end
 
 Function StackWaves_Dialog()
@@ -244,7 +241,6 @@ Function StackWavesfromListWave(ScanNumWave, BaseName,Suffix,StackName)
 	Wave ScanNumWave
 	String Basename, Suffix,StackName
 	variable n
-	string Stacklist=""
 	For(n=0;n<dimsize(ScanNumWave,0);n+=1)
 		if (ScanNumWave[n]<10)
 			wave wv=$(BaseName+"00"+num2str(ScanNumWave[n])+Suffix)
@@ -280,9 +276,7 @@ Function StackWavesfromListWave(ScanNumWave, BaseName,Suffix,StackName)
 				wv_stack[][][][n]=wv[p][q][r]
 				break
 		endswitch
-		Stacklist=addlistitem(NameofWave(wv),Stacklist)
 	EndFor
-	Note wv_stack, "WavesStacked:"+Stacklist+"\r"
 End
 Function StackWavesSubFolder_Dialog()
 	string ScanNumWavePath,fldBasename,fldSuffix,Wave2stack,StackName
@@ -304,7 +298,6 @@ Function StackWaveSubfolder(ScanNumWave, fldBaseName,fldSuffix, wave2stack,Stack
 	Wave ScanNumWave
 	String fldBasename, fldSuffix,StackName,wave2stack
 	variable n
-	string Stacklist=""
 	For(n=0;n<dimsize(ScanNumWave,0);n+=1)
 		variable num=ScanNumWave[n]
 		string numstr=Num2Str_SetLen(num,4)
@@ -337,9 +330,7 @@ Function StackWaveSubfolder(ScanNumWave, fldBaseName,fldSuffix, wave2stack,Stack
 				wv_stack[][][][n]=wv[p][q][r]
 				break
 		endswitch
-		Stacklist=addlistitem(NameofWave(wv),Stacklist)
 	endfor
-	Note wv_stack, "WavesStacked:"+Stacklist+"\r"
 end
 Function StackWavesfromFirstLast_Dialog()
 string ScanNumWavePath,Basename,Suffix,StackName,ScaleStr
@@ -362,7 +353,6 @@ Function StackWavesfromFirstLastCountBy(BaseName,Suffix,StackName,ScaleStr,first
 	variable first,last,countby
 	String Basename, Suffix,StackName,ScaleStr
 	variable num=(last-first)/countby+1,i
-	string Stacklist=""
 	For(i=0;i<num;i+=1)
 		wave wv=$WaveNamewithNum(basename,first+i*countby,suffix)
 //		print 	BaseName+num2str(ScanNum)+Suffix
@@ -394,9 +384,7 @@ Function StackWavesfromFirstLastCountBy(BaseName,Suffix,StackName,ScaleStr,first
 				wv_stack[][][][i]=wv[p][q][r]
 				break
 		endswitch
-	Stacklist=addlistitem(NameofWave(wv),Stacklist)	
 	EndFor
-	Note wv_stack, "WavesStacked:"+Stacklist+"\r"
 	//Wave scaling
 	if(strlen(ScaleStr)==0)
 		ScaleStr=num2str(first)+";"+num2str(countby)+";ScanNum"
@@ -415,6 +403,8 @@ Function StackWavesfromFirstLastCountBy(BaseName,Suffix,StackName,ScaleStr,first
 			SetScale/p t,offset, delta, units, wv_stack	
 			break
 	endswitch
+	note wv_stack, "Stack num: "+num2str(first)+"/"+num2str(last)+"/"+num2str(countby)+"/r"
+	note wv_stack, "Stack basename: "+basename+";"+"stack suffix:"+suffix+"/r"
 End
 Function StackWavesfromFirstLast(BaseName,Suffix,StackName,ScaleStr,first,last)
 	variable first,last
@@ -462,3 +452,49 @@ Function MakeDFnMoveWaves(first,last, basename, suffix,dfn,stackfldr)
 		stackallinfolder()
 	endif
 end
+
+	string df=getdf()
+	svar dname=$(df+"dname")
+	setupV(getdfname(),dname)
+	
+Function MakeDFnMoveFolder_Dialog()
+	variable first, last, stackfldr, countby=1
+	string Basename, Suffix,df="root:data"
+	Prompt first, "first scan number:"
+	Prompt last, "last scan number:"
+	Prompt countby, "count by:"
+	Prompt Basename, "base name:"
+	Prompt Suffix, "suffix:"
+	Prompt df, "data folder full path"
+	Prompt stackfldr, "Stack all in folder?", popup, "no;yes"
+	DoPrompt "Wave name = BaseName+ScanNumber+Suffix", first, last,countby Basename, Suffix, df, stackfldr
+	if(v_flag)
+		abort
+	endif
+	stackfldr-=1 //makes boolean no=0;yes=1
+	string txt="\""+Basename+"\",\""+Suffix+"\",\""+df+"\","+num2str(stackfldr)+","+num2str(first)+","+num2str(last)+","+num2str(countby)
+	MakeDFnMoveFolders(Basename,Suffix,df,stackfldr,first,last,countby)
+	print "MakeDFnMoveFolders("+txt+")"
+End
+
+
+Function MakeDFnMoveFolders(Basename,Suffix,DataFolder,stackfldr,first,last,countby)
+	variable first, last, countby, stackfldr
+	string basename, suffix,DataFolder
+	if (datafolderexists(DataFolder))
+	else 
+		newdatafolder $DataFolder
+	endif
+	variable i
+	
+	For(i=first;i<=last;i+=countby)
+		string mda=FolderNamewithNum(basename,i,suffix)
+		Execute "MoveDataFolder "+mda+","+DataFolder
+	//	MoveDataFolder	mda, df
+	endfor
+	if(stackfldr==1)
+		setdatafolder $DataFolder
+		stackallinfolder()
+	endif
+end
+

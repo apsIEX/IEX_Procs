@@ -4,7 +4,7 @@
 
 // $Description: Loader for files found at IEX Beamline  (Sector 29 at the APS) 
 // $Author: JLM$
-// SVN History: $Revision: 2.04 $ on $Date:May 11, 2017 $
+// SVN History: $Revision: 3 $ on $Date:May 11, 2020 $
 
 /// Developement for the IEX Beamline (Sector 29 at the APS) June 2011
 ///	v1.01	Added an MDAascii load 11/25/2013
@@ -16,7 +16,7 @@
 	///v2.04 Fixed LoaderPanel renaming bug added help functions
 	//20170817 loading arpes data cropped added dither
 	// v2.06 Cleaned up procedure to make easier to share - implemented static functions
-//v3.00 Mda loader works on window, procedure uses static functions to a standalone
+	//v3.00 Mda loader works on window, procedure uses static functions to a standalone
 
 Menu "Data"
 		"IEX LoaderPanel", Loader_Panel()
@@ -36,10 +36,12 @@ function LoaderPanelVariables()
 	string dfn="LoaderPanel", df="root:"+dfn+":"
 	NewDataFolder/o/s root:LoaderPanel
 	string/g filepath, filename, filelist, nfile, folderList, LPext,  datatype, datatypelist,wvdf, loadedwvlist
-	variable/g filenum,checkBE_KE, checkTransImg
+	variable/g filenum
+	variable/g checkBE_KE,checkbox_TransImg, checkbox_SweptImg,check_Transpose
 	svar filepath=$(df+"filepath"), filename=$(df+"filename"), filelist=$(df+"filelist"), nfile=$(df+"nfile"), folderList=$(df+"folderList")
 	svar datatypelist=$(df+"datatypelist"), datatype=$(df+"datatype"), wvdf=$(df+"wvdf"), loadedwvlist=$(df+"loadedwvlist")
-	nvar filenum=$(df+"filenum"), checkBE_KE=$(df+"checkBE_KE"),checkTransImg=$(df+"checkTransImg")
+	nvar filenum=$(df+"filenum")
+	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_TransImg=$(df+"checkbox_TransImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
 	make/o/w/u $(df+"filecolors")
 	wave  filecolors= $(df+"filecolors") 
 	filecolors={{0,0,0},{0,0,0},{0,0,65535},{65535,0,0}}
@@ -53,7 +55,10 @@ function LoaderPanelVariables()
 	datatypelist="MDA;Igor Binary;General Text;Spec;MDAascii;Tiff;NetCDF;MPA" ///edit to include other data types
 	datatype="MDA" ////change default time here
 	wvdf="root:"
-	checkTransImg=1
+	checkBE_KE=0
+	checkbox_TransImg=1
+	checkbox_SweptImg=1
+	check_Transpose=1
 end
 
 Function LoaderPanelSetup() 
@@ -95,11 +100,17 @@ Function LoaderPanelSetup()
 	Button PLHelp pos={350,10 }, size={20,20}, title="?", proc=JLM_LoaderPanelHelp
 
 	//Variables
-	CheckBox checkbox_KE_BE, title="BE", pos={342,75},size={30,15},variable=root:LoaderPanel:checkBE_KE,disable=1
+	CheckBox checkbox_KE_BE, title="BE", pos={342,75},size={30,15},variable=root:LoaderPanel:checkBE_KE,disable=0
 	CheckBox checkbox_KE_BE, help={"Check for scaling data to be in binding energy"}
 	
-	CheckBox checkbox_TransImg title="Avg Transmission",pos={220,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkTransImg,disable=0
+	CheckBox checkbox_TransImg title="Avg Trans",pos={220,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkbox_TransImg,disable=0
 	CheckBox checkbox_TransImg, help={"UnCheck to load transimssion data as image"}
+	
+	CheckBox checkbox_SweptImg title="Avg Swept",pos={290,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkbox_SweptImg,disable=0
+	CheckBox checkbox_SweptImg, help={"UnCheck to load swept data as image"}
+	
+	CheckBox check_Transpose title="E vs K",pos={220,105}, size={95,15}, value=1,variable=root:LoaderPanel:check_Transpose,disable=0
+	CheckBox check_Transpose, help={"UnCheck to load energy as x-axis"}
 end
 
 Function LoaderSelectFilter(ctrlName,varNum,varStr,varName) : SetVariableControl
@@ -217,7 +228,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break	
 		case "Igor Experiment":
 			LPext="*.pxp"
@@ -225,7 +238,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break
 		case "General Text":
 			LPext="*.txt"
@@ -233,7 +248,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break
 		case "Spec":
 			LPext="*.*"
@@ -241,7 +258,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load Experiment",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break
 		case "MDAascii":
 			LPext="*.asc"
@@ -249,7 +268,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break	
 		case "MDA":
 			LPext="*.mda"
@@ -257,7 +278,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break
 		case "Tiff":
 			LPext="*.tif"
@@ -265,7 +288,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =0
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break
 		case "NetCDF":
 			LPext="*.nc"
@@ -273,7 +298,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=0
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=0
+			CheckBox checkbox_SweptImg, disable=0
+			CheckBox check_Transpose, disable=0
 		break
 		case "MPA":
 			LPext="*.mpa"
@@ -281,7 +308,9 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_SweptImg, disable=1
+			CheckBox check_Transpose, disable=1
 		break
 	endswitch
 	LoaderUpdateFilesLB(ctrlName)
@@ -855,7 +884,7 @@ Function/S MDAmkascii(SpectraLoadNViewpath)
 			ascii=parsefilepath(5,SpecialDirPath("Igor Pro User Files", 0, 0, 0)+SpectraLoadNViewpath,"/",0,0)+"mda_tmp"
 			ascii=replacestring(" ", ascii, "\\\ ")
 			sprintf cmd, "do shell script \" mkdir -p %s\"", ascii
-//			print cmd
+			print cmd
 		Break
 		EndSwitch
 		ExecuteScriptText cmd
@@ -1121,6 +1150,7 @@ Function/s LoadMDAascii(df) //uses ReduceList
 	setdatafolder $df2d
 	LoadMDAasciiRenameDets(df,firstscan)
 	LoadMDAasciiSetScales(df,df2d,dims)
+	SRS_MakeGainWave()
 	//return loadedwv
 end
 
@@ -1247,6 +1277,30 @@ Function LoadMDAasciiSetScales(df,df2d,dims)
 		endfor
 	endfor
 End	
+
+Function SRS_MakeGainWave()
+	variable DetNum
+	for(DetNum=1;DetNum<4;DetNum+=1)
+		wave sen_num=$("c29idd_A"+num2str(DetNum)+"sens_num_VAL")
+		wave sen_unit=$("c29idd_A"+num2str(DetNum)+"sens_unit_VAL")
+		if(WaveExists(sen_num))
+			duplicate/o sen_num $("c29idd_A"+num2str(DetNum)+"_Gain")
+			wave gain_wv=$("c29idd_A"+num2str(DetNum)+"_Gain")
+			gain_wv= SRS_State2Val(sen_num,sen_unit)
+		endif
+	endfor
+end
+
+Function SRS_State2Val(num,unit)
+	variable num,unit
+	variable gain
+	string NumList="1;2;5;10;20;50;100;200;500"
+	gain=str2num(stringfromlist(num,NumList,";"))
+	gain*=1e-12*10^(3*unit)
+	return gain
+end
+
+
 /////////////////////////////////////////////////////
 ///MDA tools
 /////////////////////////////////////////////////////
@@ -1289,6 +1343,7 @@ Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "Wave note tools"	
 			Submenu "MDA Tools"
+				"MDA Panel",mdaKey_Panel()
 				"MDA Extra PVs -- list all", ExtraPVnotebook()
 				"MDA keyword search", print "ExtraPVstrList(\"pv\")"
 				"MDA Extra PV val", print "ExtraPVva(\"pv\")"
@@ -1833,7 +1888,7 @@ Function/s LoadNetCDF(df)
 	NetCDF_SES_CropImage(wv)
 	nvar checkBE_KE=$(df+"checkBE_KE")
 	if (checkBE_KE==1)
-		variable wk=4.8
+		variable wk=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_Energy Offset",":",";") 
 		IEX_SetEnergyScale(wvname,0,wavedims(wv)-1,wk)
 	endif
 	//return filename[0,strlen(filename)-4]
@@ -1861,7 +1916,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	string dfn=getdatafolder(0)
 	wave nc_Attr_DetectorMode,nc_Attr_AcquisitionMode, nc_Attr_LensMode
 	wave nc_Attr_LowEnergy, nc_Attr_HighEnergy, nc_Attr_ActualPhotonEnergy, nc_Attr_EnergyStep, nc_Attr_EnergyStep_RBV
-	wave nc_Attr_EnergyStep_Fixed,nc_Attr_EnergyStep_Fixed_RBV, nc_Attr_EnergyStep_Swept, nc_Attr_EnergyStep_Swept_RBV
+	wave nc_Attr_EnergyStep_Fixed_RBV, nc_Attr_EnergyStep_Swept, nc_Attr_EnergyStep_Swept_RBV
 	wave nc_Attr_PassEnergy
 	wave nc_Attr_FirstChannel
 	wave nc_Attr_CentreEnergy_RBV
@@ -1879,6 +1934,10 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	string PElist="1;2;5;10;20;50;100;200;500"
 	variable PE=str2num(stringfromlist(PassEnergyMode,PElist,";"))
 	variable EperChannel=nc_Attr_EnergyStep_Fixed_RBV[0]
+	
+	string df="root:LoaderPanel:"
+	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_TransImg=$(df+"checkbox_TransImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
+	
 	if(waveExists(nc_Attr_EnergyStep_Swept))
 		Edelta=selectnumber(DetMode,-nc_Attr_EnergyStep_Swept[0],nc_Attr_EnergyStep_Swept[0])
 	else
@@ -1903,23 +1962,12 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
 		break
 	endswitch
+	SetScale/p x, Estart,Edelta,Eunits,wv
+	
 	//Angular Scaling Info
 	variable DegPerChannel=.0292717// from SES file should be 0.0678/0.1631*EperChannel//
 //	print DegPerChannel
-	If(LensMode==0)
-		// Transmission
-			nvar checkTransImg=root:LoaderPanel:checkTransImg
-			if (checkTransImg==1)
-				string opt="/X/D=root:"+dfn+"avgy"
-				JLM_FileLoaderModule#ImgAvg(wv,opt)
-				wave avg=$("root:"+dfn+"avgy")
-				note avg Note(wv)
-				killwaves wv
-				SetScale/p x, Estart,Edelta,Eunits,avg
-			else
-				SetScale/p x, Estart,Edelta,Eunits,wv
-		endif
-	Else //Angular Mode
+	If(LensMode>-1) //Sets angular scale unless transmission then leaves pixel JM was here
 		variable CenterChannel=571
 		variable FirstChannel
 		If(waveExists(nc_Attr_FirstChannel))
@@ -1927,15 +1975,28 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 		else
 			FirstChannel=0
 		endif
-		//rotate image (KE vs deg)
-		Redimension/S/N=(dimsize(nc_array_data,1),dimsize(nc_array_data,0),-1,-1) wv
-		wv[][][][]=nc_array_data[q][p][r][x]	
-		SetScale/p y, Estart,Edelta,Eunits,wv
-		SetScale/p x, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv
+		SetScale/p y, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv
 	EndIf
 	If(dimsize(wv,2)==1)
 		Redimension/N=(-1,-1,0) wv
 	endif
+	//Checkbox transformations
+	if (checkbox_TransImg==1 && checkbox_SweptImg==1)
+
+		string opt="/X/D=root:"+dfn+"avgy"
+		JLM_FileLoaderModule#ImgAvg(wv,opt)
+		wave avg=$("root:"+dfn+"avgy")
+		note avg Note(wv)
+		killwaves wv
+		wave wv=$("root:"+dfn+"avgy")
+	endif
+	
+	If(check_Transpose==1 && checkbox_TransImg*checkbox_SweptImg==0)//rotate image (KE vs deg)
+		Redimension/S/N=(dimsize(nc_array_data,1),dimsize(nc_array_data,0),-1,-1) wv
+		wv[][][][]=nc_array_data[q][p][r][x]	
+		SetScale/p y, Estart,Edelta,Eunits,wv//JM
+		SetScale/p x, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv //JM
+	EndIf
 
 
 	JLM_FileLoaderModule#killallinfolder(dfn)
@@ -1950,6 +2011,8 @@ Menu "APS Procs"
 		end
 	end
 end
+
+
 
 Function IEX_SetEnergyScale_Dialog()
 	string wvname,Emodestr,Edimstr="y"
@@ -2107,7 +2170,7 @@ Function LoaderPanel_EA_Dither(basename,suffix,DitherName,first,last,k)
 	variable i
 	variable DitherNum=last-first
 	for(i=0;i<DitherNum+1;i+=1)
-		wave wv=$WaveNamewithNum(basename,first+i,suffix)
+		wave wv=$JLM_FileLoaderModule#WaveNamewithNum(basename,first+i,suffix)
 		if(i==0)
 			duplicate/o wv $DitherName
 			wave Dither=$DitherName
@@ -2129,7 +2192,7 @@ Function LoaderPanel_KillwavesFirstLast(first, last)
 variable first , last
 variable i
 for(i=0;i<abs(first-last)+1;i+=1)
-wave wv=$WaveNamewithNum("EA_",first+i,"")
+wave wv=$JLM_FileLoaderModule#WaveNamewithNum("EA_",first+i,"")
 killwaves/z wv
 endfor
 end
@@ -2147,47 +2210,138 @@ end
 Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "Wave note tools"	
-			Submenu "NetCDF Tools"
-				"nc Attributes panel",ncKey_Panel()
+			Submenu "EA_ Tools"
+				"ncAttributes panel",ncKey_Panel()
 				"nc Attributes -- list all", WavenoteNotebook_Dialog()
 				"nc Attribute keyword search", ncNoteSearch_Dialog()	
 				"nc Attributes to wave", ncNote2waveDialog()	
+				"nc Attributes Add/Replace", EAnote_AddReplace_Dialog()
+				"nc Attributes return Val", EAnote_Val_Dialog()
 			end
 		end
 	end
 end
 
-Function ncNoteSearch_Dialog()
-	string wvname, key, keysep,listsep
-	keysep=":"
-	listsep=";"
-	Prompt wvname, "Wave name",popup, WaveList("*",";","")
-	Prompt key, "Attribute:"
-	DoPrompt "netCDF wave note search", wvname, key
-	if (v_flag==0)
-			print WavenoteKeyVal(wvname,key,keysep,listsep)
+Function EAnote_AddReplace_Dialog()
+	string wvname, key
+	variable val
+	Prompt wvname, "Name of wave:", popup, WaveList("*",";","")
+	Prompt key, "keyword or PV:"
+	Prompt val, "Value:"
+	DoPrompt "nc wave note:", wvname, key, val
+	if(v_flag==0)
+		print " ncNote_AddReplace("+wvname+","+key+","+num2str(val)+")"
+		wave wv=$wvname
+		EAnote_AddReplace(wv,key,val)
 	endif
 End
 
-Function ncNote2wave(pv, destwv_name, basename,suffix,scanname_wvname)
-	string pv, basename,suffix,destwv_name,scanname_wvname
-	pv="\r"+pv
-	string keysep=":",listsep=";"
-	wave destwv_wv=$(destwv_name),scanname_wv=$(scanname_wvname)
+Function EAnote_AddReplace(wv,key,val)
+	wave wv
+	string key
+	variable val
+	string  keysep=":",listsep=";"
+	string  wvNote=Note(wv)
+	variable nc_val=NumberByKey("\r"+key,wvNote,keysep,listsep)  
+	if(numtype(nc_val)!=0)
+		Note wv, key+keysep+num2str(val)+listsep+"\r"
+	else
+		wvNote=ReplaceNumberbyKey("\r"+key,wvNote,val,keysep,listsep)
+		Note/k wv, wvNote
+	endif
+End
+
+Function EAnote_Val_Dialog()
+	string wvname, key
+	variable val
+	Prompt wvname, "Name of wave:", popup, WaveList("*",";","")
+	Prompt key, "keyword or PV:"
+	DoPrompt "nc wave note:", wvname, key
+	if(v_flag==0)
+		print " ncNote_Val("+wvname+","+key+")"
+		wave wv=$wvname
+		EAnote_Val(wv,key)
+	endif
+End
+
+Function EAnote_Val(wv,key)
+	wave wv
+	string key
+	string  keysep=":",listsep=";"
+	string  wvNote=Note(wv)
+	variable nc_val=NumberByKey("\r"+key,wvNote,keysep,listsep)  
+	return nc_val
+end
+
+Function/s EAnote_Str(wv,key)
+	wave wv
+	string key
+	string  keysep=":",listsep=";"
+	string  wvNote=Note(wv)
+	string nc_str=StringByKey("\r"+key,wvNote,keysep,listsep)  
+	return nc_str
+end
+
+Function EAStack_PVscaling_Dialog()
+	string basename="EA_",suffix="",stackname, scalestr, PV
+	wave wv=$stringfromlist(0,WaveList("EA_*",";",""),";")
+	string AttrList=ncPanel_AttributeList(wv)
+	variable first, last, countby=1
+	Prompt basename, "Basename:"
+	Prompt suffix, "Suffix"
+	Prompt StackName, "Name of new stacked wave"
+	Prompt first, "first scan number"
+	Prompt last, "last scan number"
+	Prompt countby, "Count by"
+	Prompt PV, "PV / Attribute to scale by:", popup AttrList
+	DoPrompt "Waves to stack have the format basename+scannumber+suffix", Basename,Suffix,StackName,first,last,Countby,PV
+	if (V_Flag)
+		abort								
+	endif
+	print "EAStack_first_last_PVscaling(\""+Basename+"\",\""+suffix+"\",\""+stackname+",\""+PV+"\""+num2str(first)+","+num2str(last)+","+num2str(countby)+")"
+	
+end
+
+
+Function EAStack_FirstLast_PVscaling(basename,suffix,stackname,PV,first,last,countby)
+	variable first, last, countby
+	string basename,suffix,stackname,PV
+	variable val0,val1
+	wave wv0=$JLM_FileLoaderModule#WaveNamewithNum(Basename,first,suffix)
+	wave wv1=$JLM_FileLoaderModule#WaveNamewithNum(Basename,first+countby,suffix)
+	val0=EAnote_Val(wv0,PV)
+	val1=EAnote_Val(wv1,PV)
+	string scalestr=num2str(val0)+";"+num2str(val1-val0)+";"+PV
+	print "StackWavesfromFirstLastCountby(\""+Basename+"\",\""+suffix+"\",\""+stackname+"\",\""+scalestr+"\","+num2str(first)+","+num2str(last)+","+num2str(countby)+")"
+	JLM_FileLoaderModule#StackWavesfromFirstLastCountby(Basename,suffix,stackname,scalestr,first,last,countby)
+end
+
+Function EAStack_FirstLast_PVsort(basename,suffix,stackname,PV,first,last,countby)
+	variable first, last, countby
+	string basename,suffix,stackname,PV
+
+	make/n=(floor(last-first)/countby) wv_ScanNum, wv_PVval
+	wave  wv_ScanNum, wv_PVval
+	wv_ScanNum=first+p*countby
+	EAnote2wave(PV, wv_PVval, basename,suffix,wv_ScanNum)
+	Sort/A wv_PVval,wv_PVval, wv_ScanNum 
+	JLM_FileLoaderModule#StackWavesfromListWave(wv_ScanNum, BaseName,Suffix,StackName)
+end
+
+Function EAnote2wave(pv, wvDest, basename,suffix,wvScanNum)
+	wave wvDest, wvScanNum
+	string pv, basename,suffix
 	variable i
 	for(i=0;i<dimsize(scanname_wv,0);i+=1)
-		variable scannum=scanname_wv[i]
-		string wvn=JLM_FileLoaderModule#WaveNamewithNum(basename,scannum,suffix)
+		string wvn=JLM_FileLoaderModule#WaveNamewithNum(basename,wvScanNum[i],suffix)
 		if(WaveExists($wvn)!=1)
 			print "check the current data folder"
 		endif
-
-		variable val=WavenoteKeyVal(wvn,pv,keysep,listsep)
-		destwv_wv[i]=val
+		wvDest[i]=EAnote_Val(wv,pv)
 	endfor
 end
 
-Function ncNote2waveDialog()
+Function EAnote2waveDialog()
 	string pv,basename,suffix, destwv_name,scanname_wvname
 	string AttrList=ncPanel_AttributeList($(stringfromlist(0,WaveList("*",";",""))))
 	Prompt pv, "Attribute",popup AttrList 
@@ -2197,9 +2351,8 @@ Function ncNote2waveDialog()
 	Prompt destwv_name, "Destination wave", popup,  WaveList("*",";","")
 	DoPrompt "Wave name = prefix+scan number+suffix", pv, destwv_name, basename, scanname_wvname,suffix
 	if (v_flag==0)
-		wave dest_wv=$destwv_name, scannum_wv=$scanname_wvname
-		print "ncNote2wave(\""+pv+"\",\""+GetWavesDataFolder(dest_wv,2)+"\",\""+basename+"\",\""+suffix+"\",\""+GetWavesDataFolder(scannum_wv,2)+"\")"
-		ncNote2wave(pv, GetWavesDataFolder(dest_wv,2), basename,suffix,GetWavesDataFolder(scannum_wv,2))
+		print "EAnote2wave(\""+pv+"\",\""+GetWavesDataFolder(dest_wv,2)+"\",\""+basename+"\",\""+suffix+"\",\""+GetWavesDataFolder(scannum_wv,2)+"\")"
+		EAnote2wave(pv, $destwv_name, basename,suffix,$scanname_wvname)
 	endif
 end
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2235,7 +2388,7 @@ Function ncKeyPanel_Setup()
 	string dfn="ncKeyPanel", df="root:"+dfn+":"
 	svar key=$(df+"key"), wvname=$(df+"wvname"), wvlist=$(df+"wvlist")
 	svar val=$(df+"val")
-	NewPanel /W=(514,454,826,537)
+	NewPanel /W=(220,250,500,335)
 	DoWindow/C/T/R $dfn,dfn
 	setwindow $dfn, hook(cursorhook)=ncKeyPanel_Hook, hookevents=3, hook=$""
 	ModifyPanel cbRGB=(1,52428,52428)
@@ -2250,6 +2403,7 @@ Function ncKeyPanel_Setup()
 	Button buttonF title=">",pos={200,7},size={15,20},proc=ncKeyPanel_ButtonProcs
 	Button buttonR title="<",pos={180,7},size={15,20},proc=ncKeyPanel_ButtonProcs
 	Button buttonStackWavesbyKey title="=> wv",pos={255,31},size={50,20},proc=ncKeyPanel_ButtonProcs
+	Button buttonCmd title="cmd",pos={235,50},size={40,15},proc=ncKeyPanel_ButtonProcs
 	SetDataFolder saveDFR
 end
 Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
@@ -2275,7 +2429,10 @@ Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
 					i=0
 					wave wv=$wvname
 					svar key=$(df+"key")
-					ncPanel_StackWavesbyKey_Dialog(key)
+					EAStack_PVscaling_Dialog()
+					break
+				case "buttonCmd":
+					ncKeyPanel2cmdLine()
 					break
 			endswitch	
 			if((which+i)>itemsinlist(wvlist,";"))
@@ -2292,7 +2449,7 @@ Function ncKeyPanel_ButtonProcs(B_Struct) : ButtonControl
 			pa.popNum=which
 			pa.eventCode=2
 			ncKeyPanel_PopMenuWaveList(pa)
-			 PopupMenu popupWaveList,mode=1,popvalue=wvname//,value=fldlist 
+			PopupMenu popupWaveList,mode=1,popvalue=wvname//,value=fldlist 
 		break
 	endswitch
 End
@@ -2397,41 +2554,14 @@ Function ncKeyPanel_Hook(H_Struct)
 	endif
 end
 
-end
-
-Function ncPanel_StackWavesbyKey_Dialog(key)
-	string key
-	variable first,last
-	string basename="EA_",suffix="",StackName="Stack",pvshort="pv"
-	prompt first, "First:"
-	prompt last, "Last:"
-	prompt basename,"Basename:"
-	prompt suffix, "Suffix:"
-	prompt StackName,"Name of stacked wave:"
-	prompt pvshort, "suffix for pv wave e.g. hv"
-	doprompt  "Stackwave by pv value",first,last,basename,suffix,StackName,pvshort
-	if (v_flag==0)
-		print "ncPanel_StackWavesbyKey("+num2str(first)+","+num2str(last)+",\""+key+"\",\""+basename+"\",\""+suffix+"\",\""+StackName+"\",\""+pvshort+"\")"
-		ncPanel_StackWavesbyKey(first,last,key,basename,suffix,StackName,pvshort)
-	endif
-end
-	
-
-Function ncPanel_StackWavesbyKey(first,last,key,basename,suffix,StackName,pvshort)
-	variable first,last
-	string key,basename,suffix,StackName,pvshort
-	//Making ScanNum and pv waves
-	make/o/n=(floor(last-first+1)), $(StackName+"_ScanNum"),$(StackName+"_"+pvshort)
-	wave wv_ScanNum=$(StackName+"_ScanNum")
-	wave wv_key=$(StackName+"_"+pvshort)
-	wv_ScanNum=first+p
-	ncNote2wave(key,GetWavesDataFolder(wv_key,2), basename,suffix,GetWavesDataFolder(wv_ScanNum,2))
-	//Sort by pv_values
-	sort wv_key, wv_ScanNum, wv_key
-	StackWavesfromListWave(wv_ScanNum, basename,suffix,StackName)
+Function ncKeyPanel2cmdLine()
+	string dfn="ncKeyPanel", df="root:"+dfn+":"
+	svar key=$(df+"key"), wvname=$(df+"wvname")
+	wave wv=$wvname
+	string  keysep=":",listsep=";"
+	variable val=WavenoteKeyVal(wvname,key,keysep,listsep) 
+	print val
 End
-
-
 //=================== Wave and Folder Name Procedures ===================
 //NewPath DataExport "Doc HD:Users:Shared:User_Files:DongKiLee:Data_Export:"
 Static Function  ExportWaves_Dialog()
@@ -2518,6 +2648,109 @@ Static Function/s FolderNamewithNum(basename,scannum,suffix)
 	endfor
 
 end
+
+Static Function StackWavesfromFirstLastCountBy(BaseName,Suffix,StackName,ScaleStr,first,last,countby)
+	variable first,last,countby
+	String Basename, Suffix,StackName,ScaleStr
+	variable num=(last-first)/countby+1,i
+	For(i=0;i<num;i+=1)
+		wave wv=$JLM_FileLoaderModule#WaveNamewithNum(basename,first+i*countby,suffix)
+//		print 	BaseName+num2str(ScanNum)+Suffix
+		//Setup Stackwave
+		if(i==0)
+			duplicate/o wv $("root:"+StackName)
+			wave wv_stack=$("root:"+StackName)
+			switch(waveDims(wv))
+				case 1:
+					Redimension/N=(-1,num) wv_stack
+					break
+				case 2:
+					Redimension/N=(-1,-1,num) wv_stack
+					break
+				case 3:
+					Redimension/N=(-1,-1,-1,num) wv_stack
+					break
+			endswitch
+		endif
+		//Write wave into
+		switch(waveDims(wv))
+			case 1:
+				wv_stack[][i]=wv[p]
+				break
+			case 2:
+				wv_stack[][][i]=wv[p][q]
+				break
+			case 3:
+				wv_stack[][][][i]=wv[p][q][r]
+				break
+		endswitch
+	EndFor
+	//Wave scaling
+	if(strlen(ScaleStr)==0)
+		ScaleStr=num2str(first)+";"+num2str(countby)+";ScanNum"
+	endif
+	variable offset= str2num(stringfromlist(0,ScaleStr,";"))
+	variable delta= str2num(stringfromlist(1,ScaleStr,";"))
+	string units=stringfromlist(2,ScaleStr,";")
+	switch(waveDims(wv))
+		case 1:
+			SetScale/p y,offset, delta, units, wv_stack	
+			break
+		case 2:
+			SetScale/p z,offset, delta, units, wv_stack
+			break
+		case 3:
+			SetScale/p t,offset, delta, units, wv_stack	
+			break
+	endswitch
+	note wv_stack, "Stack num: "+num2str(first)+"/"+num2str(last)+"/"+num2str(countby)+"/r"
+	note wv_stack, "Stack basename: "+basename+";"+"stack suffix:"+suffix+"/r"
+End
+
+Static Function StackWavesfromListWave(ScanNumWave, BaseName,Suffix,StackName)
+	Wave ScanNumWave
+	String Basename, Suffix,StackName
+	variable n
+	For(n=0;n<dimsize(ScanNumWave,0);n+=1)
+		if (ScanNumWave[n]<10)
+			wave wv=$(BaseName+"00"+num2str(ScanNumWave[n])+Suffix)
+		elseif (ScanNumWave[n]<100)
+			wave wv=$(BaseName+"0"+num2str(ScanNumWave[n])+Suffix)
+		else
+			wave wv=$(BaseName+num2str(ScanNumWave[n])+Suffix)
+		endif
+//			print 	BaseName+num2str(ScanNumWave[n])+Suffix
+		if(n==0)
+			duplicate/o wv $("root:"+StackName)
+			wave wv_stack=$("root:"+StackName)
+			switch(waveDims(wv))
+				case 1:
+					Redimension/N=(-1,dimsize(ScanNumWave,0)) wv_stack
+					break
+				case 2:
+					Redimension/N=(-1,-1,dimsize(ScanNumWave,0)) wv_stack
+					break
+				case 3:
+					Redimension/N=(-1,-1,-1,dimsize(ScanNumWave,0)) wv_stack
+					break
+			endswitch
+		endif
+		switch(waveDims(wv))
+			case 1:
+				wv_stack[][n]=wv[p]
+				break
+			case 2:
+				wv_stack[][][n]=wv[p][q]	
+				break
+			case 3:
+				wv_stack[][][][n]=wv[p][q][r]
+				break
+		endswitch
+	EndFor
+End
+
+
+
 //=================== Wave note Procedures ===================
 //netcdf: key="/r....", keysp=":", listsep=";"
 Static Function WavenoteKeyVal(wvname,key,keysep,listsep)
@@ -2648,7 +2881,6 @@ Static Function/S ImgAvg( img, opt )
 //     plot:    /P  (display new image)
 	wave img
 	string opt
-	
 	//output array name
 	//variable overwrite    -- no overwrite option since output is 1D
 	string imgn=NameOfWave(img), avgn=JLM_FileLoaderModule#KeyStr("D", opt)
@@ -2656,14 +2888,12 @@ Static Function/S ImgAvg( img, opt )
 		avgn=NameOfWave(img)+"_av"
 		//overwrite=KeySet("O", opt)
 	endif
-	
 	//direction
 	variable  idir=0*JLM_FileLoaderModule#KeySet("X", opt)+1*JLM_FileLoaderModule#KeySet("Y", opt)
 	variable nav=DimSize(img, idir), n2av=DimSize(img, 1-idir)
 	//create output 1D array
 	make/o/n=(nav) $avgn
 	WAVE avg=$avgn
-	
 	//mask
 	variable imask, maskval
 	string maskn=JLM_FileLoaderModule#KeyStr("M", opt)
@@ -2695,21 +2925,20 @@ Static Function/S ImgAvg( img, opt )
 		endif
 		ii+=1
 	WHILE(ii<n2av)
-	
 	//normalize by value or masksum
 	if (imask)
 		avg/=masksum[p]
 	else
 		avg/=n2av
 	endif
-
 	//scale identical to original image
 	SetScale/P x DimOffset(img,idir), DimDelta(img,idir),WaveUnits(img,idir) avg
-	
 	if (JLM_FileLoaderModule#KeySet("P",opt))
 		Display avg
 	endif
-	
+	//copy the wave notes from the original 
+	note avg,note(img)
+	note avg, "Imgavg opt="+opt+"\r"
 	return avgn			// or return error message
 End
 static Function/T KeyStr( key, str )

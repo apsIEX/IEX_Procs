@@ -117,6 +117,38 @@ Function ExportCTandGraphImg() //exerpt from ImageTool5
 		SetAxis /W=$wn left, gV0,gV1
 		SetAxis /W=$wn bottom,gH0,gH1 
 End
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////
+///////////////////////////ImageTool Command Line  /////////////////////////	
+/////////////////////////////////////////////////////////////////////////
+
+Function CmdLineCT(which)
+	variable which
+	selectCTList("",which,"") 
+	//43 Purple-Yellow
+	//42 Rainbow Light
+End
+
+Menu "2D"
+	"Change color table from command line", print "CmdLineCT(which+1)"
+	"Stack: get x val", print "GetStack_xVal(ImageToolNum,LineNum)"
+end
+
+Menu "APS Procs"
+		Submenu "Graph Utilities"
+			"--------------"
+			"Export CT and Graph Main Img", ExportCTandGraphImg()
+			"Change color table from command line", print "CmdLineCT(which+1)"
+		End
+	End
+End
+
+Function GetStack_xVal(ImageToolNum,LineNum)
+	variable ImageToolNum,LineNum
+	wave wv=$("root:ImageToolV"+num2str(ImageToolNum)+":stack:line"+num2str(LineNum))
+	string wvNote=note(wv)
+	string Modstr=stringbykey("MOD",wvNote,":","\r")
+	string Valstr=stringbykey("Val",Modstr,"=",",")
+	variable val=str2num(Valstr)
+	return val
+End

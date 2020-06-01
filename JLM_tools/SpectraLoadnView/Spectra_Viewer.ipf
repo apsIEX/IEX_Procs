@@ -331,7 +331,7 @@ Function SVwvDFListBoxActiony (ctrlName,row,col,event) : ListBoxControl
 	wvDFSelect_y= stringfromlist(row,wvDFlist_y)
 	//	PopupMenu DFButton  mode=0
 	svar waveNote=$(df+"waveNote"), folderselect=$(df+"folderselect")
-	if((event==1))//1=mouse down
+	if((event==4))//1=mouse down
 		SVsetdatafolder()
 		nvar checked=$(df+"LiveVar")
 		SVLiveCheckProc("LiveCheck",checked)//check if Live Update is check
@@ -458,8 +458,15 @@ Function SVLiveCheckProc(ctrlName,checked) : CheckBoxControl //needs to be check
 		wave  wv=$(selectstring(cmpstr(folderselect,"root:"),"root:"+wvDFselect_y,"root:"+folderselect+":"+wvDFselect_y))
 		wave  wv_x=$(selectstring(cmpstr(folderselect,"root:"),"root:"+wvDFselect_x,"root:"+folderselect+":"+wvDFselect_x))
 		duplicate/o wv $(df+"Live_y")
-		duplicate/o wv_x $(df+"Live_x")
-		wave Live_y=$(df+"Live_y"), Live_x=$(df+"Live_x")
+		wave Live_y=$(df+"Live_y")
+		if (cmpstr(wvDFselect_x,"calc")==0)
+			duplicate/o wv $(df+"Live_x")
+			wave Live_x=$(df+"Live_x")
+			Live_x=dimoffset(Live_x,0)+dimdelta(Live_x,0)*p
+		else
+			duplicate/o wv_x $(df+"Live_x")
+			wave Live_x=$(df+"Live_x")
+		endif
 		variable i, numtraces=itemsinlist(tracenamelist(dfn,";",1),";")
 		//Check to see if wave is already on graph
 		if(numtraces==0)

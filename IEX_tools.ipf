@@ -143,58 +143,109 @@ Function IEX_RSXSmotors()
 	
 End	
 
-Function XAS_diode_Dialog()
-	variable Diode_ScanNum, TEY_ScanNum
-	string disp
-	Prompt Diode_ScanNum, "Scan Number for XAS Diode Scan:"
-	Prompt TEY_ScanNum, "Scan Number for XAS TEY Scan:"	
-	Prompt Disp, "Display?", popup "yes;no"
-	DoPrompt "XAS normalization",  Diode_ScanNum, TEY_ScanNum, disp
+/////////////////////////////////////////////////////////////////////////
+////////////////////////// Extra  PVs  /////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+Function Append_mda_wv(ScanNum,ywvName,xwvName)
+	variable ScanNum
+	string xwvName,ywvName
+	string basename="mda_", suffix=""
+	string dfn=FolderNamewithNum(basename,scannum,suffix)
+	string df="root:"+dfn+":"
+	wave xwv=$(df+xwvName)
+	wave ywv=$(df+ywvName)
+	appendtograph ywv vs xwv
+end
+
+
+Function XAS_mda(dfn, CA_TEY, CA_ref, Mono_RBV)
+	string dfn, CA_TEY, CA_ref, Mono_RBV
+	string df="root:"+dfn+":"
+	wave TEY=$(df+CA_TEY)
+	wave Mono=$(df+Mono_RBV)
+	wave Ref=$(df+CA_ref)
+	duplicate/o TEY $(df+CA_TEY+"_XAS")
+	wave XAS=$(df+CA_TEY+"_XAS")
+	XAS=TEY/Ref
+	Note XAS ,"XAS is normalized by "+CA_ref
+end	
+
+Function XAS_ARPES_Dialog()
+	string dfn, disp="yes"
+	string CA_TEY="c29idc_ca2_read", CA_ref="c29idb_ca15_read"
+	string Mono_RBV="c29idmono_ENERGY_MON"
+	string dfList=JLM_FileLoaderModule#mdaPanel_FolderListGet()
+	Prompt dfn, "mda folder:", popup dfList
+	Prompt CA_TEY, "TEY PVname:"
+	Prompt CA_Ref, "Diode PVname:"
+	Prompt disp, "Display:", popup," yes;no"
+	DoPrompt "XAS normalization",  dfn, CA_TEY,CA_Ref, disp
 	if(v_flag==0)
-		print "XAS_diode("+num2str(Diode_ScanNum)+","+num2str(TEY_ScanNum)+")"
-		XAS_diode(Diode_ScanNum, TEY_ScanNum)
+	print  dfn, CA_TEY,CA_Ref, disp
+	XAS_mda(dfn, CA_TEY, CA_ref, Mono_RBV)
 		if(cmpstr(disp,"yes")==0)
-			wave TEY=$("XAS_"+num2str(TEY_ScanNum)+"_TEY")
-			wave Energy=$("XAS_"+num2str(TEY_ScanNum)+"_Energy")
-			Display  TEY vs Energy
+			wave XAS=$(CA_TEY+"_XAS")
+			wave Energy=$CA_ref
+			Display  XAS vs Energy
 		endif
 	endif
 end
 
-Function XAS_diode(Diode_ScanNum, TEY_ScanNum)
-	variable Diode_ScanNum, TEY_ScanNum
-	string basename="mda_", suffix=""
-	string TEY_pv="c29idc_ca1_read"
-	string diode_pv="c29idc_ca1_read"
-	setdatafolder root:
-	string df_diode="root:"+FolderNamewithNum(basename,Diode_ScanNum,suffix)+":"
-	string df_tey="root:"+FolderNamewithNum(basename,TEY_ScanNum,suffix)+":"
-	wave ca15=$(df_diode+"c29idb_ca15_read ")
-	wave ca1=$(df_tey+"c29idc_ca1_read ")
-	wave TEY_energy=$(df_tey+"c29idmono_ENERGY_MON")
-	duplicate/o ca1 $("XAS_"+num2str(TEY_ScanNum)+"_TEY") 
-	duplicate/o TEY_energy $("XAS_"+num2str(TEY_ScanNum)+"_Energy") 
-	wave TEY= $("XAS_"+num2str(TEY_ScanNum)+"_TEY") 
-	wave Energy=$("XAS_"+num2str(TEY_ScanNum)+"_Energy")
-	TEY=ca1/ca15
-	Note TEY ,"Normalized by diode current mda_"+num2str(Diode_ScanNum)
-	Note Energy ,"Normalized by diode current mda_"+num2str(Diode_ScanNum)
+Function XAS_RSXS_Dialog()
+	string dfn, disp="yes"
+	string CA_TEY="c29idb_ca16_read", CA_ref="c29idb_ca14_read"
+	string Mono_RBV="c29idmono_ENERGY_MON"
+	string dfList=JLM_FileLoaderModule#mdaPanel_FolderListGet()
+	Prompt dfn, "mda folder:", popup dfList
+	Prompt CA_TEY, "TEY PVname:"
+	Prompt CA_Ref, "Diode PVname:"
+	Prompt disp, "Display:", popup," yes;no"
+	DoPrompt "XAS normalization",  dfn, CA_TEY,CA_Ref, disp
+	if(v_flag==0)
+	print  dfn, CA_TEY,CA_Ref, disp
+	XAS_mda(dfn, CA_TEY, CA_ref, Mono_RBV)
+		if(cmpstr(disp,"yes")==0)
+			wave XAS=$(CA_TEY+"_XAS")
+			wave Energy=$CA_ref
+			Display  XAS vs Energy
+		endif
+	endif
 end
 
-Function XAS_RSXS()
-	wave mesh=c29idb_ca14_read
-	wave D2=c29idb_ca16_read
-	wave TEY=c29idd_ca2_read
-	duplicate/o D2 TFY_norm
-	duplicate/o TEY TEY_norm
-	wave TEY_norm
-	wave TFY_norm
-	wave hv=c29idmono_ENERGY_MON
-//	CA2Flux_wv(hv,D2,TFY_norm)
-	TEY_norm=TEY/mesh
-	TFY_norm=TFY_norm/mesh //photons
-
+Function AppendSeries_nc_Dialog()
+	string ScanNumList,basename="EA_",suffix="avgy",scaling="BE"
+	variable wk
+	Prompt ScanNumList, "List of scan numbers \"1;25;177\""
+	Prompt basename, "basename:"
+	Prompt suffix, "suffix:"
+	Prompt scaling, "wave x-scaling?",popup "BE;KE;As is"
+	DoPrompt "Append to top graph, nc waves from list", ScanNumList,basename,suffix,scaling
+	if(v_flag==0)
+		//print "AppendSeries_nc(\"'+ScanNumList
+		AppendSeries_nc(ScanNumList,basename,suffix,scaling,wk)
+	endif
 end
+
+Function AppendSeries_nc(ScanNumList,basename,suffix,scaling,wk)
+	string ScanNumList,basename,suffix,scaling
+	variable wk
+	variable scannum,i
+	for(i=0;i<itemsinlist(ScanNumList,";");i+=1)
+		scannum=str2num(stringfromlist(i,ScanNumList,";"))
+		wave wv=$WaveNamewithNum(basename,scannum,suffix)
+		strswitch(scaling)
+			case "KE":
+				IEX_SetEnergyScale(GetWavesDataFolder(wv,2),1,0,wk)
+			break
+			case "BE":
+			 	IEX_SetEnergyScale(GetWavesDataFolder(wv,2),0,0,wk)
+			 break
+		endswitch
+		appendtograph wv
+	endfor
+end
+
+
 Menu "kspace"	
 			"kplot - IEX data", IEX_kplot_dialog() 
 	end

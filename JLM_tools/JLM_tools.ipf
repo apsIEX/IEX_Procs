@@ -7,10 +7,17 @@
 #include "JLM_WaveUtilities" //Wave Note Utilites , Scan Name Utilites
 
 Menu "APS Procs"
-	Submenu "Analysis Tools"		
-		"FitFermiGraph",FitFermiGraph()
-		"FFT to remove SES mesh", RemoveSESmesh_Dialog()
+	Submenu "Analysis Tools"
+	//Submenu "ARPES Analysis Tools"	
 		"Set df and fit with cursors", print "FolderNFit(fittype)"
+		"---ARPES---"	
+		"FitFermiGraph",FitFermiGraph()
+		"Copy results from Batch Fitting to root folder",Extract_BatchResults_Dialog()	
+		"Correct EF", Correct_EF_Dialog()
+		"FFT to remove SES mesh", RemoveSESmesh_Dialog()
+		"Determine VBM", Calc_VBM_graph_Dialog()
+		
+		"---------"
 		"Normalize Spectra XPS_XAS", Spectra_Norm_fromGraph_Dialog()
 	
 	end
@@ -27,128 +34,6 @@ Function ExecuteToAllinFolder()
 		//do what you want here
 	endfor			
 end
-
-
-/////////////////////////////////////////////////////////////////////////
-///////////////		Folder Procedures		 ////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-Function/s FolderListGet(dfr,matchstr)
-// returns an alphabetical list of folder names located in datafolder reference dfr with
-// a name matching matchstr; matchstr="*" for all folders"
-	DFREF dfr
-	string matchstr
-	string fldlist=""
-	variable i
-	for (i=0;i<countobjectsdfr(dfr, 4);i+=1)
-		string folder=GetIndexedObjNameDFR(dfr, 4, i )
-		if(stringmatch(folder,matchstr)==1)
-			fldlist=addlistitem(folder,fldlist, ";")
-		endif
-	endfor
-	fldlist=sortlist(fldlist,";",16)
-	return fldlist 
-End
-
-/////////////// 	---	Folder Panel  ---   //////////////////////////////////
-Function ChangeFolder_Panel()
-	if(WinType("ChangeFolderPanel")!=7)
-		ChangeFolderPanel_Variables()
-		ChangeFolderPanel_Setup() 
-	else
-		dowindow/f ChangeFolderPanel
-	endif
-end
-Function ChangeFolderPanel_Variables()
-	DFREF saveDFR = GetDataFolderDFR()
-	NewDataFolder/o/s root:ChangeFolderPanel
-	DFREF dfr=root:ChangeFolderPanel
-	string/g dfr:parentDF, dfr:fldname, dfr:fldlist
-	svar parentDF=dfr:parentDF, fldlist=dfr:fldlist, fldname=dfr:fldname
-	parentDF=Getdatafolder(1)
-	DFREF parentDFR=$parentDF
-	fldlist=FolderListGet(parentDFR,"*")
-	fldname=stringfromlist(0,fldname,";")
-End
-Function ChangeFolderPanel_Setup()
-	DFREF dfr=root:ChangeFolderPanel
-	svar fldlist=dfr:fldlist, fldname=dfr:fldname
-	NewPanel /W=(514,454,779,535) 
-	DoWindow/C/T/R ChangeFolderPanel,"ChangeFolderPanel"
-	setwindow ChangeFolderPanel, hook(cursorhook)=ChangeFolderPanel_Hook, hookevents=3, hook=$""
-	ModifyPanel cbRGB=(1,52428,52428)
-	SetVariable ParentFolder pos={8,8},size={200,20},limits={-inf,inf,0},title="Parent Folder:"
-	SetVariable ParentFolder,proc=ChangeFolderPanel_PopFolderList//, value= #("root:ChangeFolderPanel:ParentDF") 
-	PopupMenu popupFolderList,pos={8,38},size={95,20},proc=ChangeFolderPanel_PopFolderList,title="Folder:"
-	PopupMenu popupFolderList,mode=1,popvalue="---",value= #("root:ChangeFolderPanel:fldlist") 	
-	Button buttonF title=">",pos={200,37},size={15,20},proc=ChangeFolderPanel_ButtonProcs
-	Button buttonR title="<",pos={180,37},size={15,20},proc=ChangeFolderPanel_ButtonProcs
-End
-Function ChangeFolderPanel_PopFolderList(pa) : PopupMenuControl
-	STRUCT WMPopupAction &pa
-	pa.blockReentry = 1
-	DFREF dfr=root:ChangeFolderPanel
-	svar fldlist=dfr:fldlist, fldname=dfr:fldname,parentDF=dfr:parentDF
-	
-	DFREF parentDFR = $parentDF
-	fldlist=FolderListGet(parentDFR,"*")
-	Variable popNum = pa.popNum
-	String popStr = pa.popStr
-	fldname=popStr
-	PopupMenu popupFolderList popvalue=popStr
-//	print parentDF,fldname
-///
-	SetDataFolder  $(parentDF+fldname)
-	return 0
-End
-Function ChangeFolderPanel_ButtonProcs(B_Struct) : ButtonControl
-	STRUCT WMButtonAction &B_Struct
-	DFREF dfr=root:ChangeFolderPanel
-	svar fldlist=dfr:fldlist, fldname=dfr:fldname
-	variable which=whichlistitem(fldname,fldlist,";")
-	Switch(B_Struct.eventCode)
-		case 2: 		//Mouse up
-			variable i
-			strSwitch(B_Struct.ctrlName)
-				case "buttonF":
-					i=1
-					break
-				case  "buttonR":
-					i=-1
-					break
-			endswitch	
-			if((which+i)>itemsinlist(fldlist,";"))
-				which=0
-			elseif((which+i)<0)
-				which=itemsinlist(fldlist,";")
-			else
-				which=which+i
-			endif
-			fldname=stringfromlist(which,fldlist,";")
-			STRUCT WMPopupAction pa
-			pa.ctrlName="popupFolderList"
-			pa.popStr=fldname
-			pa.popNum=which
-			ChangeFolderPanel_PopFolderList(pa)
-			 PopupMenu popupFolderList,mode=1,popvalue=fldname//,value=fldlist 
-		break
-	endswitch
-End
-
-
-Function ChangeFolderPanel_Hook(H_Struct)
-	STRUCT WMWinHookStruct &H_Struct
-	variable eventCode = H_Struct.eventCode
-	string dfn=H_Struct.winName; string df="root:"+dfn+":"
-	if(eventcode==2)
-		dowindow /F $dfn
-		JLM_FileLoaderModule#killallinfolder(df)
-		killdatafolder $df
-		return(-1)
-	elseif(eventcode==3)
-		FolderListGet(root:ChangeFolderPanel,"*")
-	endif
-end
-End
 
 /////////////////////////////////////////////////////////////////////////
 //////////////////////////Vectorization////////////////////////////////////
@@ -229,7 +114,7 @@ Function Histogram_img2D(npx, npy, img_v, img_vx, img_vy) //make and image
 	endfor
 	img_hist/=img_norm
 end
-Function/wave VectorCrossProduct(a,b)
+Function VectorCrossProduct(a,b)
 	Wave a, b
 	if (dimsize(a,0)==3&&dimsize(b,0)==3&&wavedims(a)==1&&wavedims(b)==1)
 		make/n=3/o tempc
@@ -277,6 +162,20 @@ Function hv_kzn(n,th,c,V0)
 	return hv
 end
 
+
+Function Calc_V0(KE2,th2,chi2,KE1,th1,chi1,a,m,n)
+	variable m,KE2,th2,chi2,n,KE1,th1,chi1,a
+	variable astar=2*pi/a
+	th2=th2/180*pi
+	chi2=chi2/180*pi
+	th1=th1/180*pi
+	chi1=chi1/180*pi
+	variable V0
+	variable c=0.5124
+	V0=0.5*(astar/c)^2*(m^2+n^2)-0.5*(KE2*cos(th2)^2*cos(chi2)^2+KE1*cos(th1)^2*cos(chi1)^2)
+	return V0
+End
+
 Function Calc_kz_n(KE2,th2,chi2,KE1,th1,chi1,a)	//assumes at kz2=(n+1)*astar; kz2=n*astar
 	variable KE2,th2,chi2,KE1,th1,chi1,a
 	variable astar=2*pi/a
@@ -303,6 +202,79 @@ Function Calc_kz(KE,th,chi,V0)
 	print "kz="+num2str(kz)
 	return kz
 end
+
+/// Calculating the valance band maxima: put cursors on the leading edge of the valance ///
+/// The function fits a line between the cursors, the VBM corresponds to when this line ///
+/// crosses zero/background intensity                                                                                ///
+Function Calc_VBM_graph_Dialog()
+	variable bkg1,bkg2,cursAx,cursBx
+	string wvname, Tname
+	Tname=StringByKey("TNAME",CsrInfo(A))
+	wave wv=TraceNameToWaveRef("", Tname )
+	wvname=nameofwave(wv)
+	cursAx=xcsr(A)
+	cursBx=xcsr(B)
+	string appStr
+	Prompt wvname, "Wave:"
+	Prompt cursAx, "VBM fitting range x1(xcrs(A)):"
+	Prompt cursBx, "VBM Fitting ranges x2 (xcrs(B)):"
+	Prompt bkg1, "background x1:"
+	Prompt bkg2, "background x2:"
+	Prompt appStr, "append to graph",popup "yes;no"
+	DoPrompt "Calculate VBM" ,wvname, cursAx,cursBx,bkg1,bkg2,appStr
+	if (v_flag==0)
+		print "Calc_VBM("+Getwavesdatafolder(wv,4)+","+num2str(cursAx)+","+num2str(cursBx)+","+num2str(bkg1)+","+num2str(bkg2)+")"
+		  Calc_VBM(wv,cursAx,cursBx,bkg1,bkg2)
+		 if(cmpstr(appStr,"yes")==0)
+	 		appendtograph
+	 		wave VBM_y=$(GetWavesDataFolder(wv, 1 )+NameofWave(wv)+"_VBMy")
+			wave VBM_x=$(GetWavesDataFolder(wv, 1 )+NameofWave(wv)+"_VBMx")
+			appendtograph VBM_y vs VBM_x
+		endif
+	endif
+End
+
+Function Calc_VBM(wv,VBMx1,VBMx2,bkg1,bkg2)
+	wave wv
+	variable VBMx1,VBMx2,bkg1,bkg2
+	CurveFit/q/NTHR=0 line  wv[x2pnt(wv, VBMx1 ),x2pnt(wv, VBMx2 )] /D
+	wave fit_wv=$(GetWavesDataFolder(wv, 1 )+"fit_"+NameofWave(wv))
+	string wvNote=note(fit_wv)
+	string fitParms= StringByKey("W_coef",wvNote,"=","\r")
+	fitParms=fitParms[1,strlen(fitParms)-2]
+	variable a,b
+	a=str2num(stringfromlist(0,fitParms,","))
+	b=str2num(stringfromlist(1,fitParms,","))
+	wavestats/q/r=(bkg1,bkg2) wv
+	variable y0=V_avg
+	make/o/n=2 $(GetWavesDataFolder(wv, 1 )+NameofWave(wv)+"_VBMy")
+	make/o/n=2 $(GetWavesDataFolder(wv, 1 )+NameofWave(wv)+"_VBMx")
+	wave VBM_y=$(GetWavesDataFolder(wv, 1 )+NameofWave(wv)+"_VBMy")
+	wave VBM_x=$(GetWavesDataFolder(wv, 1 )+NameofWave(wv)+"_VBMx")
+	VBM_x[0]=min(VBMx1,VBMx2)
+	VBM_x[1]=(y0-a)/b
+	VBM_y=a+b*VBM_x
+	///updating wavenote
+	wvNote=note(wv)
+	variable VBM=NumberByKey("\rVBM",wvNote,":",";") 
+	string output=num2str(VBM_x[1])+"; range:["+num2str(x2pnt(wv, VBMx1 ))+","+num2str(x2pnt(wv, VBMx2 ))+"]"
+	if(numtype(VBM)!=0)
+		Note wv, "VBM: "+num2str(VBM_x[1])+"; range:["+num2str(x2pnt(wv, VBMx1 ))+","+num2str(x2pnt(wv, VBMx2 ))+"]"
+	else
+		wvNote=Replacestringbykey("VBM",wvNote,output,":","\r")
+		Note/k wv, wvNote
+	endif
+	print "VBM:"+output
+	///Update cursors if on graph
+	string Tname=StringByKey("TNAME",CsrInfo(A))
+	wave wv_crs=TraceNameToWaveRef("", StringByKey("TNAME",CsrInfo(A)) )
+	if(cmpstr(Getwavesdatafolder(wv_crs,4),Getwavesdatafolder(wv,4))==0)
+		Cursor A $StringByKey("TNAME",CsrInfo(A)) VBMx1
+		Cursor B $StringByKey("TNAME",CsrInfo(A)) VBMx2
+	endif
+	return VBM_x[1]
+End
+
 //////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////  	Remove Mesh via FFT	////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -399,39 +371,147 @@ Function FitFermiGraph()
 	endif
 End
 
-Function DivideFermiFunction_Dialog()
-	string wvname, wvcoef
-	variable Edim
-	Prompt wvname, "Data wave:", popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")+"; -- 1D --;"+WaveList("!*_CT",";","DIMS:1")
-	Prompt wvcoef, "Fit coeffients:", popup, WaveList("*EF_coef",";","DIMS:1")+";"+WaveList("!*_CT",";","DIMS:1")
-	Prompt Edim, "Dimension of energy axis"
-	DoPrompt "Divide by Fermi function", wvname, wvcoef, Edim
-	wave EF_coef=$wvcoef
-	if(v_flag==0)
-		Wave wv=$wvname
-		DivideFermiFunction(wv,Edim,EF_coef[0],EF_coef[1],EF_coef[2],EF_coef[3],EF_coef[4])
-		print "DivideFermiFunction("+wvname+","+num2str(EF_coef[0])+","+num2str(EF_coef[1])+","+num2str(EF_coef[2])+","+num2str(EF_coef[3])+","+num2str(EF_coef[4])+")"
-	endif
+Function Fermi_Edge_InitalGuess(wv)
+	wave wv
+	//makeing guesses
+	Variable x1=pcsr(A)
+	Variable x2= pcsr(B)
+	EdgeStats/Q/F=0.15/R=(x1,x2) wv
+	variable slope=(V_edgeLvl1-V_edgeLvl0)/(V_edgeLoc1-x1)
+	wave W_coef
+	W_coef={ V_edgeLoc2, V_edgeDloc3_1, -V_edgeAmp4_0, V_edgeLvl4, slope}
 End
 
-Function DivideFermiFunction(wv,Edim,Ef,Ew,Af,y0,Ay)
-	wave wv
-	variable Edim,Ef,Ew,Af,y0,Ay
-	duplicate/o wv $(nameofwave(wv)+"_Ediv")
-	wave wv_E=$(nameofwave(wv)+"_Ediv")
-	make/o/n=(dimsize(wv,Edim)) Fermi
-	wave Fermi
-	Fermi=y0+Ay*(x-Ef)*((x-Ef)<0)+Af*0.5*erfc((x-Ef)/(Ew/1.66511)) 	//G_step
-	switch (wavedims(wv))
-		case 1:
+Function Fermi_Edge(w,x) : FitFunc
+	Wave w
+	Variable x
+	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+	//CurveFitDialog/ Equation:
+	//CurveFitDialog/ f(x) = y0+PreEdge*(x-EF)*((x-EF)<0)+EdgeJump*0.5*erfc((x-EF)/(Ewidth/1.66511))
+	//CurveFitDialog/ End of Equation
+	//CurveFitDialog/ Independent Variables 1
+	//CurveFitDialog/ x
+	//CurveFitDialog/ Coefficients 5
+	//CurveFitDialog/ w[0] = EF
+	//CurveFitDialog/ w[1] = Ewidth
+	//CurveFitDialog/ w[2] = EdgeJump
+	//CurveFitDialog/ w[3] = y0
+	//CurveFitDialog/ w[4] = PreEdge
+	return w[3]+w[4]*(x-w[0])*((x-w[0])<0)+w[2]*0.5*erfc((x-w[0])/(w[1]/1.66511))
+End
+
+Function Extract_BatchResults_Dialog()
+	variable colNum=2
+	string ResultsMatrixFolder, newname="", ShowString
+	string ResultsMatrixFolderList= ""
+	variable i
+	for( i=0;i<CountObjects("root:WMBatchCurveFitRuns:", 4 );i+=1)
+		ResultsMatrixFolderList=AddListItem(GetIndexedObjName("root:WMBatchCurveFitRuns:", 4, i ),ResultsMatrixFolderList,";",inf)
+	endfor
+	Prompt ResultsMatrixFolder, "ResultsMatrix:", popup,ResultsMatrixFolderList
+	Prompt colNum, "Column number for energy position:"
+	Prompt newName, "New wave name, if empty string then default name"
+	Prompt ShowString, "Display Results:",popup,"Both;Table;Graph;None"
+	DoPrompt "Extract Batch Fitting position", ResultsMatrixFolder, colNum,newName,ShowString
+	//print ResultsMatrixFolder
+	wave WMBatchResultsMatrix=$("root:WMBatchCurveFitRuns:"+ResultsMatrixFolder+":WMBatchResultsMatrix")
+	if (V_flag==0)
+		print "Extract_WMBatchCurveFitResults("+GetWavesDataFolder(WMBatchResultsMatrix,2)+","+num2str(colNum)+","+newname+","+ShowString+")"
+		Extract_WMBatchCurveFitResults(WMBatchResultsMatrix,colNum,newname,ShowString)
+	endif
+end
+
+
+Function Extract_WMBatchCurveFitResults(WMBatchResultsMatrix,colNum,newname,ShowString) 
+	variable colNum
+	string newname,ShowString
+	wave WMBatchResultsMatrix
+	string dfn=stringfromlist( itemsinlist(GetWavesDataFolder(WMBatchResultsMatrix,1),":")-1,GetWavesDataFolder(WMBatchResultsMatrix,1),":")
+	make/o/n=(dimsize(WMBatchResultsMatrix,0)) $("root:"+dfn+"_Results_"+num2str(colNum))
+	wave wv_e= $("root:"+dfn+"_Results_"+num2str(colNum))
+	wv_e[]=WMBatchResultsMatrix[p][colNum]
+	wave/T wvname= $(GetWavesDataFolder(WMBatchResultsMatrix,1)+"WMbatchWaveNames")
+	string txt = wvname[0]+"\r"
+	txt+="batchCurveFitRun:"+GetWavesDataFolder(WMBatchResultsMatrix,2)+"\r"
+	txt+="column: "+num2str(colNum)+"\r"
+	note wv_e,txt	 
+	wave org=$ wvname[0]
+	setscale/p x,dimoffset(org,1),dimdelta(org,1),waveunits(org,1), wv_e
+	/////Renaming the wave
+	if (strlen(newname)>0)
+		duplicate/o wv_e $newname
+		wave wv_e=$newname
+	else 
+		duplicate/o wv_e  $(wvname[0]+"_Efit")
+		wave wv_e=$(wvname[0]+"_Efit")
+	endif
+	////Displaying Results
+	if (cmpstr(ShowString,"Table")*cmpstr(ShowString,"Both")==0)
+		edit wv_e
+	endif
+	if(cmpstr(ShowString,"Graph")*cmpstr(ShowString,"Both")==0)
+		display wv_e
+	endif
+end
+
+
+Function Correct_EF(wv,Ewv,dimE)
+	wave wv, Ewv
+	variable dimE
+	duplicate/o wv $(nameofwave(wv)+"_Ec")
+	wave wv_Ec=$(nameofwave(wv)+"_Ec")
+	//finding first valid energy point for offset
+	variable i=0,E0
+	do
+		//print i, Ewv[i], numtype(Ewv[i])
+		if(numtype(Ewv[i])==0)
+			E0=Ewv[i]
 			break
-		case 2:
-			break
+		endif
+		i+=1
+	while(i<dimsize(Ewv,0))
+	
+	switch(wavedims(wv))
+		case 2:	
+			switch(dimE)
+				case 0: //x-axis
+					wv_Ec=interp2d(wv,x+(Ewv[p]-E0),y)
+				break
+				case 1: //y-axis
+					wv_Ec=interp2d(wv,x,y+(Ewv[p]-E0))
+				break
+			endswitch
+		break
 		case 3:
-			break
-		case 4:
-			break
-	endswitch
+			switch(dimE)
+				case 0: //x-axis
+						wv_Ec=interp3d(wv,x+(Ewv[p]-E0),y,z)
+				break
+				case 1: //y-axis
+					wv_Ec=interp3d(wv,x,y+(Ewv[q]-E0),z)
+				break
+				case 2: //z-axis
+					wv_Ec=interp3d(wv,x,y,z+(Ewv[r]-E0))
+				break
+			endswitch
+		break
+		endswitch
+		Note wv_Ec, "Energy correction wave:"+NameofWave(Ewv)
+end	
+Function Correct_EF_Dialog()
+	string wvname, wvname_Efit
+	variable dimE, Eref
+	Prompt wvname,"Wave to correct:",  popup "-2D-;"+WaveList("!*_CT",";","DIMS:2")+"-3D-;"+WaveList("!*_CT",";","DIMS:3")
+	Prompt wvname_Efit, "Wave with energy positions", popup "-1D-;"+WaveList("!*_CT",";","DIMS:1")
+	Prompt dimE, "Energy axis:",popup "x;y;z"
+	DoPrompt "Correcting the Energy as a function, relative to the first value in the energy wave ", wvname, wvname_Efit, dimE 
+	if(v_flag==0)
+		wave wv=$wvname
+		wave Ewv=$wvname_Efit
+		print "Correct_EF("+wvname+","+wvname_Efit+","+num2str(dimE-1)+")"
+		Correct_EF(wv,Ewv,dimE-1)
+	endif
 End
 
 /////////////////////////////////////////////////////////////////////////
@@ -523,30 +603,19 @@ Function FolderNFit(fittype)
 	Fit2csr(fittype)
 end
 	
+
 /////////////////////////////////////////////////////////////////////////
-///////////////////////////ImageTool Add Ons///////////////////////////	
+///////////////////////////Average Image///////////////////////////	
 /////////////////////////////////////////////////////////////////////////
 
-Function CmdLineCT(which)
-	variable which
-	selectCTList("",which,"") 
-	//43 Purple-Yellow
-	//42 Rainbow Light
-End
-
-Menu "2D"
-	"Change color table from command line", print "CmdLineCT(which+1)"
+Function ImAvgY_dialog()
+//	prompt wv
+//newname
+	wave wv
+	string newname
+	string opt="/X/D=root:"+newname+"avgy"
+	ImgAvg(wv,opt)
 end
-
-Menu "APS Procs"
-		Submenu "Graph Utilities"
-			"--------------"
-			"Export CT and Graph Main Img", ExportCTandGraphImg()
-			"Change color table from command line", print "CmdLineCT(which+1)"
-		End
-	End
-End
-
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////// Transpose Wave Axes //////////////////////////	
@@ -605,3 +674,5 @@ Function Print_nc_hv_Top()
 	string wvname=nameofwave(wv)
 	Print_nc_hv(wvname)
 end
+
+
