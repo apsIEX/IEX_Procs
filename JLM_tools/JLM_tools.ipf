@@ -456,43 +456,49 @@ Function Extract_WMBatchCurveFitResults(WMBatchResultsMatrix,colNum,newname,Show
 end
 
 
-Function Correct_EF(wv,Ewv,dimE)
+Function Correct_EF(wv,Ewv,dimE,dimScan)
 	wave wv, Ewv
-	variable dimE
+	variable dimE,dimScan
 	duplicate/o wv $(nameofwave(wv)+"_Ec")
 	wave wv_Ec=$(nameofwave(wv)+"_Ec")
 	//finding first valid energy point for offset
 	variable i=0,E0
-	do
-		//print i, Ewv[i], numtype(Ewv[i])
-		if(numtype(Ewv[i])==0)
-			E0=Ewv[i]
-			break
-		endif
-		i+=1
-	while(i<dimsize(Ewv,0))
-	
+	wavestats/q Ewv
+	E0=v_avg
+
 	switch(wavedims(wv))
 		case 2:	
 			switch(dimE)
-				case 0: //x-axis
-					wv_Ec=interp2d(wv,x+(Ewv[p]-E0),y)
+				case 0: //x-axis is Energy axis
+					wv_Ec=interp2d(wv,x-(E0-Ewv[q]),y)
 				break
-				case 1: //y-axis
-					wv_Ec=interp2d(wv,x,y+(Ewv[p]-E0))
+				case 1: //y-axis is Energy axis
+					wv_Ec=interp2d(wv,x,y-(E0-Ewv[p]))
 				break
 			endswitch
 		break
 		case 3:
 			switch(dimE)
-				case 0: //x-axis
-						wv_Ec=interp3d(wv,x+(Ewv[p]-E0),y,z)
+				case 0: //x-axis is Energy axis
+					if(dimScan==1)
+						wv_Ec=interp3d(wv,x-(E0-Ewv[q]),y,z)
+					elseif(dimScan==2)
+						wv_Ec=interp3d(wv,x-(E0-Ewv[r]),y,z)
+					endif
 				break
-				case 1: //y-axis
-					wv_Ec=interp3d(wv,x,y+(Ewv[q]-E0),z)
+				case 1: //y-axis is Energy axis
+					if(dimScan==0)
+						wv_Ec=interp3d(wv,x,y-(E0-Ewv[p]),z)
+					elseif(dimScan==2)
+						wv_Ec=interp3d(wv,x,y-(E0-Ewv[r]),z)
+					endif
 				break
-				case 2: //z-axis
-					wv_Ec=interp3d(wv,x,y,z+(Ewv[r]-E0))
+				case 2: //z-axis is Energy axis
+					if(dimScan==0)
+						wv_Ec=interp3d(wv,x,y,z-(E0-Ewv[p]))
+					elseif(dimScan==1)
+						wv_Ec=interp3d(wv,x,y,z-(E0-Ewv[q]))
+					endif
 				break
 			endswitch
 		break
@@ -501,19 +507,19 @@ Function Correct_EF(wv,Ewv,dimE)
 end	
 Function Correct_EF_Dialog()
 	string wvname, wvname_Efit
-	variable dimE, Eref
+	variable dimE, dimScan
 	Prompt wvname,"Wave to correct:",  popup "-2D-;"+WaveList("!*_CT",";","DIMS:2")+"-3D-;"+WaveList("!*_CT",";","DIMS:3")
 	Prompt wvname_Efit, "Wave with energy positions", popup "-1D-;"+WaveList("!*_CT",";","DIMS:1")
 	Prompt dimE, "Energy axis:",popup "x;y;z"
-	DoPrompt "Correcting the Energy as a function, relative to the first value in the energy wave ", wvname, wvname_Efit, dimE 
+	Prompt dimScan, "Dependent axis",popup "x;y;z"
+	DoPrompt "Correcting the Energy as a function, relative to the first value in the energy wave ", wvname, wvname_Efit, dimE,dimScan
 	if(v_flag==0)
 		wave wv=$wvname
 		wave Ewv=$wvname_Efit
 		print "Correct_EF("+wvname+","+wvname_Efit+","+num2str(dimE-1)+")"
-		Correct_EF(wv,Ewv,dimE-1)
+		Correct_EF(wv,Ewv,dimE-1,dimScan-1)
 	endif
 End
-
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////// Normalize XPS, XAS /////////////////////////////
 /////////////////////////////////////////////////////////////////////////
