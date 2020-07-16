@@ -37,11 +37,11 @@ function LoaderPanelVariables()
 	NewDataFolder/o/s root:LoaderPanel
 	string/g filepath, filename, filelist, nfile, folderList, LPext,  datatype, datatypelist,wvdf, loadedwvlist
 	variable/g filenum
-	variable/g checkBE_KE,checkbox_TransImg, checkbox_SweptImg,check_Transpose
+	variable/g checkBE_KE,checkbox_AvgImg, checkbox_SweptImg,check_Transpose
 	svar filepath=$(df+"filepath"), filename=$(df+"filename"), filelist=$(df+"filelist"), nfile=$(df+"nfile"), folderList=$(df+"folderList")
 	svar datatypelist=$(df+"datatypelist"), datatype=$(df+"datatype"), wvdf=$(df+"wvdf"), loadedwvlist=$(df+"loadedwvlist")
 	nvar filenum=$(df+"filenum")
-	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_TransImg=$(df+"checkbox_TransImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
+	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_AvgImg=$(df+"checkbox_AvgImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
 	make/o/w/u $(df+"filecolors")
 	wave  filecolors= $(df+"filecolors") 
 	filecolors={{0,0,0},{0,0,0},{0,0,65535},{65535,0,0}}
@@ -56,7 +56,7 @@ function LoaderPanelVariables()
 	datatype="MDA" ////change default time here
 	wvdf="root:"
 	checkBE_KE=0
-	checkbox_TransImg=1
+	checkbox_AvgImg=0
 	checkbox_SweptImg=1
 	check_Transpose=1
 end
@@ -103,10 +103,10 @@ Function LoaderPanelSetup()
 	CheckBox checkbox_KE_BE, title="BE", pos={342,75},size={30,15},variable=root:LoaderPanel:checkBE_KE,disable=0
 	CheckBox checkbox_KE_BE, help={"Check for scaling data to be in binding energy"}
 	
-	CheckBox checkbox_TransImg title="Avg Trans",pos={220,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkbox_TransImg,disable=0
-	CheckBox checkbox_TransImg, help={"UnCheck to load transimssion data as image"}
+	CheckBox checkbox_AvgImg title="Integrate Angle",pos={220,90}, size={95,15},variable=root:LoaderPanel:checkbox_AvgImg,disable=0
+	CheckBox checkbox_AvgImg, help={"Check to load Integrate Angle Data"}
 	
-	CheckBox checkbox_SweptImg title="Avg Swept",pos={290,90}, size={95,15}, value=1,variable=root:LoaderPanel:checkbox_SweptImg,disable=0
+	CheckBox checkbox_SweptImg title="Avg Swept",pos={275,105}, size={95,15},variable=root:LoaderPanel:checkbox_SweptImg,disable=0
 	CheckBox checkbox_SweptImg, help={"UnCheck to load swept data as image"}
 	
 	CheckBox check_Transpose title="E vs K",pos={220,105}, size={95,15}, value=1,variable=root:LoaderPanel:check_Transpose,disable=0
@@ -228,7 +228,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break	
@@ -238,7 +238,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break
@@ -248,7 +248,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load All",  disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break
@@ -258,7 +258,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton  title="Load Experiment",  disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break
@@ -268,7 +268,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break	
@@ -278,7 +278,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break
@@ -288,7 +288,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=0
 			Button TiffAllButton, disable =0
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break
@@ -298,7 +298,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=0
-			CheckBox checkbox_TransImg, disable=0
+			CheckBox checkbox_AvgImg, disable=0
 			CheckBox checkbox_SweptImg, disable=0
 			CheckBox check_Transpose, disable=0
 		break
@@ -308,7 +308,7 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			Button LoadAllButton title="Load All", disable=1
 			Button TiffAllButton, disable =1
 			CheckBox checkbox_KE_BE, disable=1
-			CheckBox checkbox_TransImg, disable=1
+			CheckBox checkbox_AvgImg, disable=1
 			CheckBox checkbox_SweptImg, disable=1
 			CheckBox check_Transpose, disable=1
 		break
@@ -1936,7 +1936,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	variable EperChannel=nc_Attr_EnergyStep_Fixed_RBV[0]
 	
 	string df="root:LoaderPanel:"
-	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_TransImg=$(df+"checkbox_TransImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
+	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_AvgImg=$(df+"checkbox_AvgImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
 	
 	if(waveExists(nc_Attr_EnergyStep_Swept))
 		Edelta=selectnumber(DetMode,-nc_Attr_EnergyStep_Swept[0],nc_Attr_EnergyStep_Swept[0])
@@ -1981,8 +1981,8 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 		Redimension/N=(-1,-1,0) wv
 	endif
 	//Checkbox transformations
-	if (checkbox_TransImg==1 && checkbox_SweptImg==1)
-
+	print checkbox_AvgImg,checkbox_SweptImg,AcqMode
+	if (checkbox_AvgImg==1 || (checkbox_SweptImg==1 && AcqMode==0))//checks if boxes are check
 		string opt="/X/D=root:"+dfn+"avgy"
 		JLM_FileLoaderModule#ImgAvg(wv,opt)
 		wave avg=$("root:"+dfn+"avgy")
@@ -1990,8 +1990,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 		killwaves wv
 		wave wv=$("root:"+dfn+"avgy")
 	endif
-	
-	If(check_Transpose==1 && checkbox_TransImg*checkbox_SweptImg==0)//rotate image (KE vs deg)
+	If(check_Transpose==1 && checkbox_AvgImg*checkbox_SweptImg==0)//rotate image (KE vs deg)
 		Redimension/S/N=(dimsize(nc_array_data,1),dimsize(nc_array_data,0),-1,-1) wv
 		wv[][][][]=nc_array_data[q][p][r][x]	
 		SetScale/p y, Estart,Edelta,Eunits,wv//JM
@@ -2561,6 +2560,38 @@ Function ncKeyPanel2cmdLine()
 	string  keysep=":",listsep=";"
 	variable val=WavenoteKeyVal(wvname,key,keysep,listsep) 
 	print val
+End
+
+Function ncPanel_StackWavesbyKey_Dialog(key)
+	string key
+	variable first,last
+	string basename="EA_",suffix="",StackName="Stack",pvshort="pv"
+	prompt first, "First:"
+	prompt last, "Last:"
+	prompt basename,"Basename:"
+	prompt suffix, "Suffix:"
+	prompt StackName,"Name of stacked wave:"
+	prompt pvshort, "suffix for pv wave e.g. hv"
+	doprompt  "Stackwave by pv value",first,last,basename,suffix,StackName,pvshort
+	if (v_flag==0)
+		print "ncPanel_StackWavesbyKey("+num2str(first)+","+num2str(last)+",\""+key+"\",\""+basename+"\",\""+suffix+"\",\""+StackName+"\",\""+pvshort+"\")"
+		ncPanel_StackWavesbyKey(first,last,key,basename,suffix,StackName,pvshort)
+	endif
+end
+	
+
+Function ncPanel_StackWavesbyKey(first,last,key,basename,suffix,StackName,pvshort)
+	variable first,last
+	string key,basename,suffix,StackName,pvshort
+	//Making ScanNum and pv waves
+	make/o/n=(floor(last-first+1)), $(StackName+"_ScanNum"),$(StackName+"_"+pvshort)
+	wave wv_ScanNum=$(StackName+"_ScanNum")
+	wave wv_key=$(StackName+"_"+pvshort)
+	wv_ScanNum=first+p
+	EANote2wave(key,wv_key, basename,suffix,wv_ScanNum)
+	//Sort by pv_values
+	sort wv_key, wv_ScanNum, wv_key
+	StackWavesfromListWave(wv_ScanNum, basename,suffix,StackName)
 End
 //=================== Wave and Folder Name Procedures ===================
 //NewPath DataExport "Doc HD:Users:Shared:User_Files:DongKiLee:Data_Export:"
