@@ -16,6 +16,7 @@ End
 Menu "APS Procs"
 	"<BLoader_Panel"
 	"NewSpectraViewer"
+	"JLM Help File", DisplayHelpTopic "JLM_Help"
 	"-"
 	Submenu "Extensions"
 //		"NewShadowPanel"

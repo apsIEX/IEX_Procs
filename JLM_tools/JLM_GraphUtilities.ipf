@@ -114,7 +114,7 @@ Function OffsetSingleTrace(trace_num, offset_x,offset_y)
 end
 
 Function ColorTrace_Dialog()
-	string ColorList="black;red;green;blue;magenta;cyan;purple"
+	string ColorList="black;red;green;blue;magenta;cyan;purple;u_black;u_purple;u_lilac;u_blue;u_lightblue;u_teal;u_brightgreen;u_;orange;u_red"
 	variable trace_num
 	string color
 	Prompt trace_num, "Trace number:"
@@ -125,7 +125,7 @@ Function ColorTrace_Dialog()
 		ColorTrace(trace_num,color)
 	endif
 End
-Function ColorTrace(trace_num,color)
+Function ColorTrace(trace_num,color) //https://www.somersault1824.com/tips-for-designing-scientific-figures-for-color-blind-readers/
 	variable trace_num
 	string color
 	string rgb
@@ -153,9 +153,63 @@ Function ColorTrace(trace_num,color)
 		case "purple":
 			rgb="(36873,14755,58982)"	
 			break
+		//color bind compatible palette
+		//https://www.somersault1824.com/tips-for-designing-scientific-figures-for-color-blind-readers/
+		
+		case "u_black":
+			rgb="(0,0,0)"
+			break
+		case "u_teal":
+			rgb="(0,28032,28032)"	
+			break
+		case "u_purple":
+			rgb="(18688,0,37376)"	
+			break
+		case "u_blue":
+			rgb="(0,28013,56283)"	
+			break	
+		case "u_lilac":
+			rgb="(46774,28013,65535)"	
+			break
+		case "u_lightblue":
+			rgb="(28013,46774,65535)"	
+			break
+		case "u_red":
+			rgb="(37522,0,0)"	
+			break
+		case "u_raspberry":
+			rgb="(52428,1,20971)"
+			break	
+		case "u_orange":
+			rgb="(56283,28013,0)"	
+			break
+		case "u_brightgreen":
+			rgb="(9472,65535,28160)"	
+			break
 	endswitch
 	Execute "ModifyGraph rgb("+trace+")="+rgb
 End	
+
+function rgb_val(bit8)
+	variable bit8
+	variable bit16
+	//bit16=((bit8+1)*2^8)-1
+	bit16=bit8*257
+	return bit16
+end
+function rgblist_8_2_16(rgblist)
+	string rgblist
+	string newlist=""
+	variable i,val16,val8
+	for(i=0;i<itemsinlist(rgblist,",");i+=1)
+		val8=str2num(stringfromlist(i,rgblist,","))
+		val16=rgb_val(val8)
+		newlist=addlistitem(num2str(val16),newlist,",",inf)
+	endfor
+	
+	print "rgb=\"("+newlist[0,strlen(newlist)-2]+")\""
+end
+
 //////////////////////////////////////////////////////
 //////////////  --- Windows Tools --- ///////////////////
 //////////////////////////////////////////////////////
@@ -221,6 +275,32 @@ Function LedgendwithFoldersTitle(Title)
 	txt=txt[0,strlen(txt)-1]
 	Legend/C/N=text0/J txt
 end
+
+Function LedgendwithFoldersTitleList(LegendList,Title)
+	string LegendList,Title 
+	Legend/C/N=text0/A=MC
+	string tlist=tracenamelist("",";",1) 
+	string txt="", df, wvname
+	if(strlen(Title)>0)
+		txt=Title+"\r"
+	endif
+	variable i
+	For(i=0;i<itemsinlist(tlist,";");i+=1)
+		df=getwavesdatafolder(tracenametowaveref("", stringfromlist(i,tlist,";")),0)
+		wvname=nameofwave(tracenametowaveref("", stringfromlist(i,tlist,";")))
+		txt=txt+"\\s("+stringfromlist(i,tlist,";")+") "+df+" "+stringfromlist(i,LegendList,";")+"\r"
+	endfor
+	txt=txt[0,strlen(txt)-2]
+	tlist=ImageNameList("",";")
+	For(i=0;i<itemsinlist(tlist,";");i+=1)
+		df=getwavesdatafolder(imagenametowaveref("", stringfromlist(i,tlist,";")),0)
+		wvname=nameofwave(imagenametowaveref("", stringfromlist(i,tlist,";")))
+		txt=txt+"\\s("+stringfromlist(i,tlist,";")+") "+df+" "+stringfromlist(i,LegendList,";")+"\r"
+	endfor
+	txt=txt[0,strlen(txt)-1]
+	Legend/C/N=text0/J txt
+end
+
 Function LegendfromList(LegendList,Title,overwrite) //overwrite ==0 to include tracename
 	String LegendList,Title
 	variable overwrite
@@ -501,8 +581,9 @@ Function AppendSeriesFolder_FirstLast(wvName_y, wvName_x,basename,suffix,first, 
 	variable scanNum
 	string FolderList=""
 	for(scanNum=first;scanNum<=last;scanNum+=countby)
-		FolderList=addlistitem(WaveNamewithNum(basename,scanNum,suffix),FolderList,";",inf)
+		FolderList=addlistitem(FolderNamewithNum(basename,scanNum,suffix),FolderList,";",inf)
 	endfor
+	print FolderList
 	AppendSeriesFolder_List(FolderList,wvname_y, wvname_x)
 End
 
@@ -537,8 +618,9 @@ Function AppendSeriesFolder_List(FolderList,wvname_y, wvname_x)
 	string FolderList,wvname_y, wvname_x
 	variable i
 	for(i=0;i<itemsinlist(FolderList,";");i+=1)
-		string df=stringfromlist(i,FolderList,";")
+		string df=":"+stringfromlist(i,FolderList,";")+":"
 		wave wv=$(df+wvname_y)
+		print df+wvname_y
 		if(cmpstr(wvname_x,"Calculated"))
 			appendtograph wv
 		else
