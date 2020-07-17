@@ -583,7 +583,6 @@ Function AppendSeriesFolder_FirstLast(wvName_y, wvName_x,basename,suffix,first, 
 	for(scanNum=first;scanNum<=last;scanNum+=countby)
 		FolderList=addlistitem(FolderNamewithNum(basename,scanNum,suffix),FolderList,";",inf)
 	endfor
-	print FolderList
 	AppendSeriesFolder_List(FolderList,wvname_y, wvname_x)
 End
 
