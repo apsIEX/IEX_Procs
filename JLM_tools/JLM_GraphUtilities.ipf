@@ -711,36 +711,64 @@ End
 
 Function Crop_xy_Dialog()
 	variable first_x, last_x, first_y, last_y
-	string wvname
+	string wvname,Scale_or_Point
 	Prompt wvname, "Wave to crop", popup, WaveList("!*CT*", ";", "DIMS:2")+";"+WaveList("!*CT*", ";", "DIMS:3")+";"+WaveList("!*CT*", ";", "DIMS:4")
+	Prompt Scale_or_Point, "Scaling:",popup, "x/y; p/q"
 	Prompt first_x, "First x-point in cropped image"
 	Prompt last_x, "Last x-point in cropped image"
 	Prompt first_y, "First y-point in cropped image"
 	Prompt last_y, "Last y-point in cropped image"	
 	DoPrompt "Cropping xy",wvname, first_x, last_x, first_y, last_y 
 	if(v_flag==0)
-		print "Crop_xy("+wvname+","+num2str(first_x)+","+num2str(last_x)+","+num2str(first_y)+","+num2str(last_y)+")"
 		wave wv=$wvname
-		Crop_xy(wv,first_x, last_x, first_y, last_y)
+		if (cmpstr(Scale_or_Point, "x/yg")==0)
+			print "Crop_xy("+wvname+","+num2str(first_x)+","+num2str(last_x)+","+num2str(first_y)+","+num2str(last_y)+")"
+			Crop_xy(wv,first_x, last_x, first_y, last_y)
+		elseif(cmpstr(Scale_or_Point, " p/q")==0)
+			print "Crop_xy_point("+wvname+","+num2str(first_x)+","+num2str(last_x)+","+num2str(first_y)+","+num2str(last_y)+")"
+			Crop_xy_point(wv,first_x, last_x, first_y, last_y)
+		endif
 	endif
 End
 
+
+Function Crop_xy_point(wv,first_p, last_p, first_q, last_q)
+	variable first_p, last_p, first_q, last_q
+	wave wv
+	variable scale_offset
+	// x-axis
+	scale_offset=dimoffset(wv,0)
+	DeletePoints/M=0 last_p+1, dimsize(wv,0), wv
+	DeletePoints/M=0 0,first_p,wv
+	SetScale/p x, scale_offset+dimdelta(wv,0)*first_p,dimdelta(wv,0), waveunits(wv,0), wv
+	// y-axis
+	scale_offset=dimoffset(wv,1)
+	DeletePoints/M=1 last_q+1, dimsize(wv,1)-(last_q+1), wv
+	DeletePoints/M=1 0,first_q,wv
+	SetScale/p y, scale_offset+dimdelta(wv,1)*first_q, dimdelta(wv,1),waveunits(wv,1), wv	
+
+end
 
 Function Crop_xy(wv,first_x, last_x, first_y, last_y)
 	variable first_x, last_x, first_y, last_y
 	wave wv
 	variable scale_offset
+	variable first_p, last_p, first_q, last_q
+	first_p=min(floor((first_x-dimoffset(wv,0))/dimdelta(wv,0)),floor((last_x-dimoffset(wv,0))/dimdelta(wv,0)))
+	last_p=max(floor((first_x-dimoffset(wv,0))/dimdelta(wv,0)),floor((last_x-dimoffset(wv,0))/dimdelta(wv,0)))
+	first_q=min(floor((first_y-dimoffset(wv,1))/dimdelta(wv,1)),floor((last_y-dimoffset(wv,1))/dimdelta(wv,1)))
+	last_q=max(floor((first_y-dimoffset(wv,1))/dimdelta(wv,1)),floor((last_y-dimoffset(wv,1))/dimdelta(wv,1)))
+	print first_p,last_p, first_q, last_q
 	// x-axis
 	scale_offset=dimoffset(wv,0)
-	DeletePoints/M=0 last_x+1, dimsize(wv,0)-(last_x+1), wv
-	DeletePoints/M=0 0,first_x,wv
-	SetScale/p x, scale_offset+dimdelta(wv,0)*first_x,dimdelta(wv,0), waveunits(wv,0), wv
+	DeletePoints/M=0 last_p+1, dimsize(wv,0), wv
+	DeletePoints/M=0 0,first_p,wv
+	SetScale/p x, scale_offset+dimdelta(wv,0)*first_p,dimdelta(wv,0), waveunits(wv,0), wv
 	// y-axis
 	scale_offset=dimoffset(wv,1)
-	DeletePoints/M=1 last_y+1, dimsize(wv,1)-(last_y+1), wv
-	DeletePoints/M=1 0,first_y,wv
-	SetScale/p y, scale_offset+dimdelta(wv,1)*first_y, dimdelta(wv,1),waveunits(wv,1), wv	
-
+	DeletePoints/M=1 last_q+1, dimsize(wv,1), wv
+	DeletePoints/M=1 0,first_q,wv
+	SetScale/p y, scale_offset+dimdelta(wv,1)*first_q, dimdelta(wv,1),waveunits(wv,1), wv	
 end
 
 
