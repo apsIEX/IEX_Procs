@@ -721,7 +721,7 @@ Function Crop_xy_Dialog()
 	DoPrompt "Cropping xy",wvname, first_x, last_x, first_y, last_y 
 	if(v_flag==0)
 		wave wv=$wvname
-		if (cmpstr(Scale_or_Point, "x/yg")==0)
+		if (cmpstr(Scale_or_Point, "x/y")==0)
 			print "Crop_xy("+wvname+","+num2str(first_x)+","+num2str(last_x)+","+num2str(first_y)+","+num2str(last_y)+")"
 			Crop_xy(wv,first_x, last_x, first_y, last_y)
 		elseif(cmpstr(Scale_or_Point, " p/q")==0)
