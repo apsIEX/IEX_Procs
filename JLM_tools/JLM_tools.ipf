@@ -523,6 +523,15 @@ End
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////// Normalize XPS, XAS /////////////////////////////
 /////////////////////////////////////////////////////////////////////////
+Function/wave Norm2One(wv)
+	wave wv
+	duplicate/o wv $(nameofwave(wv)+"_n")
+	wave wv_n=$(nameofwave(wv)+"_n")
+	wavestats/q wv
+	wv_n=(wv-v_min)/(v_max -v_min)
+	return wv_n
+End
+
 Function Spectra_Norm_fromGraph_Dialog()
 	string wvname
 	variable p1,p2,ReplaceTraces,SRonly
@@ -584,6 +593,130 @@ Function Spectra_Norm(wvlist,p1,p2,Method) //Method=0 divide by the ring curren 
 		endif
 	endfor
 end
+
+
+Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_TEY, wv_I0, wv_hv, DoPreEdge,DoPostEdge)
+	variable preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,DoPreEdge,DoPostEdge  //1=do, 0=skip
+	wave wv_TEY, wv_I0, wv_hv
+	
+	variable range_xA, range_xB, a, b
+	
+	wave TEY_n= XAS_norm2one(wv_TEY)
+	wave I0_n= XAS_norm2one(wv_I0)
+	duplicate/o wv_TEY XAS
+	wave XAS
+	XAS=TEY_n/I0_n
+	duplicate/o wv_hv XAS_hv 
+	wave hv=XAS_hv
+	
+	//find XAS edge
+	Differentiate XAS/X=hv/D=XAS_DIF
+	wavestats/q XAS_DIF
+	variable Edge_p=x2pnt(XAS_DIF,v_maxloc)
+	variable Edge_x=hv[x2pnt(XAS_DIF,v_maxloc)]
+	String EdgeNote=StringByKey("\rXAS_Edge",note(XAS),":",";") 
+		if(strlen(EdgeNote)==0)
+			Note XAS, "XAS_Edge: "+num2str(Edge_x)
+		else
+			string nt=Replacestringbykey("XAS_Edge",nt,num2str(Edge_x))
+			Note/k XAS, nt
+		endif
+
+	//pre-edge subtraction	
+	if(DoPreEdge ==1)
+		range_xA=dimoffset(hv,0)
+		range_xB=dimoffset(hv,0)+dimdelta(hv,0)*dimsize(hv,0)
+		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,preEdge_xA, preEdge_xB, XAS,hv)
+		duplicate/o XAS_bkg XAS
+		//adding/updating wavenotes
+		String preEdge=StringByKey("\rXAS_preEdge",note(XAS),":",";") 
+		if(strlen(preEdge)==0)
+			Note XAS, "XAS_preEdge: "+num2str(a)+"; "+num2str(b)
+		else
+			nt=Replacestringbykey("XAS_preEdge",nt,num2str(a)+"; "+num2str(b),":","\r")
+			Note/k XAS, nt
+		endif
+	endif
+	
+	//post-edge subtraction
+	if(DoPostEdge ==1)
+		range_xA=Edge_x
+		range_xB=dimoffset(hv,0)+dimdelta(hv,0)*dimsize(hv,0)
+		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,postEdge_xA, postEdge_xB, XAS,hv)
+		duplicate/o XAS_bkg XAS
+		//adding/updating wavenotes
+		String postEdge=StringByKey("\rXAS_postEdge",note(XAS),":",";") 
+		if(strlen(postEdge)==0)
+			Note XAS, "XAS_postEdge: "+num2str(a)+"; "+num2str(b)
+		else
+			nt=Replacestringbykey("XAS_postEdge",nt,num2str(a)+"; "+num2str(b),":","\r")
+			Note/k XAS, nt
+		endif
+	endif
+End
+Function/wave XAS_norm2one(wv)
+	wave wv
+	duplicate/o wv $(nameofwave(wv)+"_n")
+	wave wv_n=$(nameofwave(wv)+"_n")
+	wavestats/q wv
+	wv_n=(wv-v_min+.1*v_min)/(v_max -v_min)
+	return wv_n
+End
+
+Function/wave LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x)
+	variable range_xA,range_xB,bkg_xA, bkg_xB
+	wave wv,wv_x
+	variable pA,pB, a,b,brkpnt_y
+	pA=x2pnt(wv,bkg_xA)
+	pB=x2pnt(wv,bkg_xB)
+	string w_coef
+	//Fitting a line
+	CurveFit/q/NTHR=0 line  wv[pA,pB] /X=wv_x /D 
+	wave fit_wv=$(GetWavesDataFolder(wv,1)+"fit_"+GetWavesDataFolder(wv,4))
+	w_coef= StringByKey("W_coef",note(fit_wv),"=","\r")
+	a=str2num(stringfromlist(0,w_coef[2,strlen(w_coef)-2],","))
+	b=str2num(stringfromlist(1,w_coef[2,strlen(w_coef)-2],","))
+	//Doing subtraction
+	duplicate/o wv $(GetWavesDataFolder(wv,2)+"_bkg")
+	wave wv_bkg=$(GetWavesDataFolder(wv,2)+"_bkg")
+	//wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-(a+b*wv_x[p])+101.832//-wv[x2pnt(wv,range_xA)]
+	print a,b,wv[x2pnt(wv,range_xA)], b*wv_x[x2pnt(wv,range_xA)]
+	wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-b*wv_x[p]//+(a+wv[x2pnt(wv,range_xA)])
+	wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-b*wv_x[p]+b*wv_x[x2pnt(wv,range_xA)]//+(a+wv[x2pnt(wv,range_xA)])
+	//Comments	
+	String BkgSub=StringByKey("\rBkgSub",note(wv),":",";") 
+	if(strlen(BkgSub)==0)
+		//Note wv_bkg, "BkgSub: "+num2str(a)+"; "+num2str(b)
+	else
+		//nt=Replacestringbykey("BkgSub:",nt,num2str(a)+"; "+num2str(b),":","\r")
+		//Note/k wv_bkg, nt
+	endif
+	return wv_bkg
+End
+
+Function LinearBackgroundSubtract_Dialog()
+	string range, bkg
+	wave wv,wv_x
+	string wv_name, wv_x_name
+	Prompt wv_name, "Wave:", popup, waveList("*",";","DIMS:1")
+	Prompt wv_x_name,"x-wave (empty string for wave scaling):",  popup, waveList("*",";","DIMS:1")
+	Prompt range,"Range to apply background subtraction (xA,xB):"
+	Prompt bkg, "Region to fit (xA,xB):"
+	DoPrompt "Linear background subtraction parameters"wv_name, wv_x_name, range,bkg
+	if (v_flag==0)
+		print "LinearBackgroundSubtract("+range+","+bkg+","+wv_name+","+wv_x_name+")"
+		wave wv=$wv_name
+		wave wv_x=$(wv_x_name)
+		variable range_xA=str2num(stringfromlist(0,range,","))
+		variable range_xB=str2num(stringfromlist(1,range,","))
+		variable bkg_xA=str2num(stringfromlist(0,bkg,","))
+		variable bkg_xB=str2num(stringfromlist(1,bkg,","))
+		LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x)
+	endif
+End
+
+
+
 
 /////////////////////////////////////////////////////////////////////////
 //////////////////////Folder Fits//////////////////////////////
