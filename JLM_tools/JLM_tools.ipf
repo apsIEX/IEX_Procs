@@ -680,7 +680,7 @@ Function/wave LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x
 	duplicate/o wv $(GetWavesDataFolder(wv,2)+"_bkg")
 	wave wv_bkg=$(GetWavesDataFolder(wv,2)+"_bkg")
 	//wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-(a+b*wv_x[p])+101.832//-wv[x2pnt(wv,range_xA)]
-	print a,b,wv[x2pnt(wv,range_xA)], b*wv_x[x2pnt(wv,range_xA)]
+	//print a,b,wv[x2pnt(wv,range_xA)], b*wv_x[x2pnt(wv,range_xA)]
 	wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-b*wv_x[p]//+(a+wv[x2pnt(wv,range_xA)])
 	wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-b*wv_x[p]+b*wv_x[x2pnt(wv,range_xA)]//+(a+wv[x2pnt(wv,range_xA)])
 	//Comments	

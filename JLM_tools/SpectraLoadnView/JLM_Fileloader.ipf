@@ -1879,11 +1879,25 @@ Function/s LoadNetCDF(df)
 	duplicatedatafolder $(df+"nc_load") $("root:"+filename[0,strlen(filename)-4])
 	setdatafolder $("root:"+filename[0,strlen(filename)-4])
 	killdatafolder $(df+"nc_load")
+	/////////////  ----- flipping image if the camera is upsidedown ----- //////////////////
+	variable flipping=0 //set 1 for a camera upsidedown otherwise set to 0
+	if(flipping==1)
+		wave nc_array_data
+		duplicate nc_array_data nc_array_flipped
+		wave  nc_array_flipped
+		nc_array_flipped[][][] = nc_array_data[dimsize(nc_array_data,0)-1-p][dimsize(nc_array_data,1)-1-q][r]
+		variable Edim=1, offset_np=100
+		//adding buffer to not account for center being different
+		DeletePoints/M=(Edim) dimsize(nc_array_flipped,Edim)-1-offset_np,offset_np, nc_array_flipped
+		InsertPoints/M=(Edim) 0,100, nc_array_flipped
+		//cleaning up
+		nc_array_data=nc_array_flipped
+		killwaves nc_array_flipped
+	endif
+	
 	NetCDFmetadata()
 	NetCDF_SESscaling()
 	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4]+"avgy",filename[0,strlen(filename)-4])
-//	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4],filename[0,strlen(filename)-3])
-//	wvname=SelectString(wavedims())
 	wave wv=$wvname
 	NetCDF_SES_CropImage(wv)
 	nvar checkBE_KE=$(df+"checkBE_KE")
@@ -1893,6 +1907,7 @@ Function/s LoadNetCDF(df)
 	endif
 	//return filename[0,strlen(filename)-4]
 End
+
 Function NetCDFmetadata()
 	string df=getdatafolder(1)
 	wave nc_array_data //datafile
@@ -1996,12 +2011,18 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 		SetScale/p y, Estart,Edelta,Eunits,wv//JM
 		SetScale/p x, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv //JM
 	EndIf
-
-
 	JLM_FileLoaderModule#killallinfolder(dfn)
 	killdatafolder dfn
 end
-
+Function NetCDF_SES_CropImage(wv)
+	wave wv
+		if(dimsize(wv,0)==1000)
+		variable p1=338,p2=819 // data exists between p1 and p2
+		deletepoints/m=0 p2,dimsize(wv,0), wv //right side
+		deletepoints/m=0 0,p1, wv //left side
+		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
+	endif
+end
 Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "ARPES - Analysis Tools"		
@@ -2196,24 +2217,14 @@ killwaves/z wv
 endfor
 end
 
-Function NetCDF_SES_CropImage(wv)
-	wave wv
-		if(dimsize(wv,0)==1000)
-		variable p1=338,p2=819 // data exists between p1 and p2
-		deletepoints/m=0 p2,dimsize(wv,0), wv //right side
-		deletepoints/m=0 0,p1, wv //left side
-		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
-	endif
-end
-
 Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "Wave note tools"	
 			Submenu "EA_ Tools"
 				"ncAttributes panel",ncKey_Panel()
 				"nc Attributes -- list all", WavenoteNotebook_Dialog()
-				"nc Attribute keyword search", ncNoteSearch_Dialog()	
-				"nc Attributes to wave", ncNote2waveDialog()	
+				"nc Attribute keyword search", EANoteSearch_Dialog()	
+				"nc Attributes to wave", EANote2waveDialog()	
 				"nc Attributes Add/Replace", EAnote_AddReplace_Dialog()
 				"nc Attributes return Val", EAnote_Val_Dialog()
 			end
@@ -2297,7 +2308,7 @@ Function EAStack_PVscaling_Dialog()
 	if (V_Flag)
 		abort								
 	endif
-	print "EAStack_first_last_PVscaling(\""+Basename+"\",\""+suffix+"\",\""+stackname+",\""+PV+"\""+num2str(first)+","+num2str(last)+","+num2str(countby)+")"
+	print "EAStack_FirstLast_PVscaling(\""+Basename+"\",\""+suffix+"\",\""+stackname+"\","+PV+"\""+num2str(first)+","+num2str(last)+","+num2str(countby)+")"
 	
 end
 
@@ -2331,8 +2342,9 @@ Function EAnote2wave(pv, wvDest, basename,suffix,wvScanNum)
 	wave wvDest, wvScanNum
 	string pv, basename,suffix
 	variable i
-	for(i=0;i<dimsize(scanname_wv,0);i+=1)
+	for(i=0;i<dimsize(wvScanNum,0);i+=1)
 		string wvn=JLM_FileLoaderModule#WaveNamewithNum(basename,wvScanNum[i],suffix)
+		wave wv=$wvn
 		if(WaveExists($wvn)!=1)
 			print "check the current data folder"
 		endif
@@ -2348,7 +2360,7 @@ Function EAnote2waveDialog()
 	Prompt suffix, "Wave name suffix"
 	Prompt scanname_wvname, "Wave with scan numbers",popup, WaveList("*",";","")
 	Prompt destwv_name, "Destination wave", popup,  WaveList("*",";","")
-	DoPrompt "Wave name = prefix+scan number+suffix", pv, destwv_name, basename, scanname_wvname,suffix
+	DoPrompt "Wave name = prefix+scan number+suffix, EApanel must be open", pv, destwv_name, basename, scanname_wvname,suffix
 	if (v_flag==0)
 		print "EAnote2wave(\""+pv+"\",\""+GetWavesDataFolder(dest_wv,2)+"\",\""+basename+"\",\""+suffix+"\",\""+GetWavesDataFolder(scannum_wv,2)+"\")"
 		EAnote2wave(pv, $destwv_name, basename,suffix,$scanname_wvname)
