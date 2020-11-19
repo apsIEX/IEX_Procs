@@ -1875,7 +1875,17 @@ Function/s LoadNetCDF(df)
 	killdatafolder/z $(df+"nc_load")
 	newdatafolder $(df+"nc_load")
 	setdatafolder $(df+"nc_load")
-	Execute "Load_NetCDF/P=LoadPath/T/Q "+df+"filename"
+	variable v=IgorVersion()
+	if (v<8)
+		Execute "Load_NetCDF/P=LoadPath/T/Q "+df+"filename"
+
+	else
+		variable/g   fileID_temp	
+		Execute "NC_openfile/PATH=LoadPathp  fileID_temp as "+filename
+		Execute "NC_LoadData/All fileID_temp"
+		Execute "NC_closefile fileID_temp"
+	endif
+	
 	duplicatedatafolder $(df+"nc_load") $("root:"+filename[0,strlen(filename)-4])
 	setdatafolder $("root:"+filename[0,strlen(filename)-4])
 	killdatafolder $(df+"nc_load")
@@ -2878,6 +2888,25 @@ static Function/T ReduceList( liststr, matchstr )
         return  outlist
 end
 
+static Function List2TextW( list, separator, outw )
+//================================
+// convert string list to string array (text wave)
+// fastest version using new built-in function StringFromList()
+	string list, separator, outw
+	variable NL=ItemsInList( list, separator )
+	make/O/T/n=(NL) $outw
+	wave/T ow=$outw
+	variable i=0, indx
+	string istr, list2=list
+	//variable itimer=StartMSTimer
+	do
+		ow[i]=StringFromList( i, list, separator )   //fastest
+		//ow[i]=StrFromList_( list, i, separator )   //slowest
+		i+=1
+	while (i<NL)
+	//print StopMSTimer(itimer)/1E3, " msec"
+	return i
+End
 
 //=================== Progress Window ===================
 //written by Eli Rotenberg in Fits loader

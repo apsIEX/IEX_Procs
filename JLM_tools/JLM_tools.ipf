@@ -10,19 +10,40 @@ Menu "APS Procs"
 	Submenu "Analysis Tools"
 	//Submenu "ARPES Analysis Tools"	
 		"Set df and fit with cursors", print "FolderNFit(fittype)"
+		"Take Deriviative",TakeDeriviative_Dialog()
+		"LinearBackgroundSubtract",LinearBackgroundSubtract_Dialog()
+		"Spectra_Norm_fromGraph",Spectra_Norm_fromGraph_Dialog()
+		
 		"---ARPES---"	
 		"FitFermiGraph",FitFermiGraph()
 		"Copy results from Batch Fitting to root folder",Extract_BatchResults_Dialog()	
 		"Correct EF", Correct_EF_Dialog()
 		"FFT to remove SES mesh", RemoveSESmesh_Dialog()
-		"Determine VBM", Calc_VBM_graph_Dialog()
-		
+		"Determine VBM", Calc_VBM_graph_Dialog()		
 		"---------"
-		"Normalize Spectra XPS_XAS", Spectra_Norm_fromGraph_Dialog()
+		"Normalize Spectra XAS", XAS_Normalization_Dialog()
+		
 	
 	end
 end
 
+
+
+/////////////////////////////////////////////////////////////////////////
+///////////////Misc. //////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+Function FindClosestpoint(val,wv)
+	variable val
+	wave wv
+	variable i,delta=inf,pnt
+	for(i=0;i<dimsize(wv,0);i+=1)
+		if( abs(wv[i]-val)<delta)
+			delta=abs(wv[i]-val)
+			pnt=i
+		endif
+	endfor
+	return pnt
+end
 /////////////////////////////////////////////////////////////////////////
 ///////////////Folder management Template //////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
@@ -330,6 +351,41 @@ Function RemoveSESmesh_Dialog()
 		RemoveSESmesh(wv,r0) 
 	endif
 end	
+//////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////  	Differentiate	////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
+Function TakeDeriviative_Dialog()
+	string wvname
+	variable axis, der
+	Prompt wvname, "Select wave to FFT:", popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")
+	Prompt axis, "Energy Dimension:", popup, "x;y;z"
+	Prompt der, "Derivative:", popup, "second; first"
+	DoPrompt "Take derivative with resespect to energy:", wvname, axis, der
+	if (v_flag==0)	
+		variable Edim=axis-1
+		variable order=3-der
+		print " TakeDeriviative(\""+wvname+"\","+num2str(Edim)+","+num2str(order)+")"
+		 TakeDeriviative(wvname, Edim,order)
+	endif
+end	
+
+Function TakeDeriviative(wvname, Edim,order)
+	string wvname
+	variable Edim,order
+	variable i
+	for(i=0;i<=order;i+=1)
+		if(i==0)
+			duplicate/o $wvname $(wvname+"_DIF")
+			wave wv=$wvname 
+			wave wv_DIF=$(wvname+"_DIF")
+		elseif(i==1)
+			duplicate/o $(wvname+"_DIF") $(wvname+"_DIF2")
+			wave wv= $(wvname+"_DIF") 
+			wave wv_DIF=$(wvname+"_DIF2")
+		endif
+		Differentiate/DIM=0  wv/D=wv_DIF
+	endfor
+end
 	
 /////////////////////////////////////////////////////////////////////////
 ///////////////////////////////Fermi level fits/////////////////////////////
@@ -595,17 +651,66 @@ Function Spectra_Norm(wvlist,p1,p2,Method) //Method=0 divide by the ring curren 
 end
 
 
-Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_TEY, wv_I0, wv_hv, DoPreEdge,DoPostEdge)
+Function XAS_Normalization_Dialog()
+	variable preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,DoPreEdge,DoPostEdge  //1=do, 0=skip
+	variable showSpectra //1=dispaly
+	string wvname_TEY, wvname_I0, wvname_hv,XASname="XAS"
+	string preEdge="xA;xB", postEdge="xA;xB"
+	variable preEdgeDo,postEdgeDo
+	Prompt wvname_TEY, "TEY or TFY wave:",  popup "-Select wave-;"+WaveList("!*_CT",";","DIMS:1")
+	Prompt wvname_I0, "I0 wave):",  popup "-Select wave-;"+WaveList("!*_CT",";","DIMS:1")
+	Prompt wvname_hv, "photon energy wave:",  popup "c29idmono_ENERGY_MON;"+WaveList("!*_CT",";","DIMS:1")
+	Prompt preEdge,"preEdge x-range:"
+	Prompt preEdgeDo,"Fit preEdge", popup,"yes;no"
+	Prompt postEdge,"postEdge x-range:"
+	Prompt postEdgeDo,"Fit postEdge", popup,"yes;no"
+	Prompt showSpectra, "Show normalizes XAS", popup, "yes;no"
+	Prompt XASname, "Name of XAS wave:"
+	DoPrompt "Normalize XAS spectra", wvname_TEY,wvname_I0,wvname_hv,preEdge,preEdgeDo,postEdge,postEdgeDo,XASname,showSpectra
+	if (v_flag==0)
+		wave  wv_TEY=$wvname_TEY
+		wave  wv_I0=$wvname_I0
+		wave  wv_hv=$wvname_hv
+		preEdge_xA=str2num(stringfromlist(0,preEdge,";"))
+		preEdge_xB=str2num(stringfromlist(1,preEdge,";"))
+		if(numtype(preEdge_xA)*numtype(preEdge_xB)!=0)
+			preEdge_xA=wv_hv[0]
+			preEdge_xB=wv_hv[dimsize(wv_hv,0)-1]
+		endif
+		DoPreEdge=2-preEdgeDo
+		postEdge_xA=str2num(stringfromlist(0,postEdge,";"))
+		postEdge_xB=str2num(stringfromlist(1,postEdge,";"))
+		DoPostEdge=2-postEdgeDo
+		if(numtype(postEdge_xA)*numtype(postEdge_xB)!=0)
+			postEdge_xA=wv_hv[0]
+			postEdge_xB=wv_hv[dimsize(wv_hv,0)-1]
+		endif
+		string cmd= "XAS_Normalization("+num2str(preEdge_xA)+", "+num2str(preEdge_xB)+","+num2str(postEdge_xA)+","+num2str(postEdge_xB)+","
+		cmd+=wvname_TEY+","+wvname_I0+", "+wvname_hv+","+num2str(DoPreEdge)+","+num2str(DoPostEdge)+",\""+XASname+"\")"
+		print cmd
+		execute cmd
+		if(showSpectra==1)
+			wave XAS=$XASname, XAS_hv
+			display XAS vs XAS_hv
+		endif
+		
+	endif
+	End
+
+Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_TEY, wv_I0, wv_hv, DoPreEdge,DoPostEdge,XASname)
 	variable preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,DoPreEdge,DoPostEdge  //1=do, 0=skip
 	wave wv_TEY, wv_I0, wv_hv
+	string XASname
 	
 	variable range_xA, range_xB, a, b
 	
 	wave TEY_n= XAS_norm2one(wv_TEY)
-	wave I0_n= XAS_norm2one(wv_I0)
-	duplicate/o wv_TEY XAS
-	wave XAS
-	XAS=TEY_n/I0_n
+	duplicate/o wv_TEY $XASname
+	wave XAS=$XASname
+	if (WaveExists(wv_I0))
+		wave I0_n= XAS_norm2one(wv_I0)
+		XAS=TEY_n/I0_n
+	endif
 	duplicate/o wv_hv XAS_hv 
 	wave hv=XAS_hv
 	
@@ -624,8 +729,8 @@ Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_T
 
 	//pre-edge subtraction	
 	if(DoPreEdge ==1)
-		range_xA=dimoffset(hv,0)
-		range_xB=dimoffset(hv,0)+dimdelta(hv,0)*dimsize(hv,0)
+		range_xA=hv[0]
+		range_xB=hv[dimsize(hv,0)]
 		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,preEdge_xA, preEdge_xB, XAS,hv)
 		duplicate/o XAS_bkg XAS
 		//adding/updating wavenotes
@@ -636,13 +741,19 @@ Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_T
 			nt=Replacestringbykey("XAS_preEdge",nt,num2str(a)+"; "+num2str(b),":","\r")
 			Note/k XAS, nt
 		endif
+		variable pA,pB
+		findlevel/q hv, preEdge_xA;pA=round(v_levelX)
+		findlevel/q hv, preEdge_xB;pB=round(v_levelX)
+		wavestats/q/r=(pA,pB) XAS
+		//print v_avg
+		XAS=XAS-v_avg
 	endif
 	
 	//post-edge subtraction
 	if(DoPostEdge ==1)
 		range_xA=Edge_x
-		range_xB=dimoffset(hv,0)+dimdelta(hv,0)*dimsize(hv,0)
-		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,postEdge_xA, postEdge_xB, XAS,hv)
+		range_xB=hv[dimsize(hv,0)]
+		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,postEdge_xA, min(range_xB,postEdge_xB), XAS,hv)
 		duplicate/o XAS_bkg XAS
 		//adding/updating wavenotes
 		String postEdge=StringByKey("\rXAS_postEdge",note(XAS),":",";") 
@@ -654,6 +765,7 @@ Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_T
 		endif
 	endif
 End
+
 Function/wave XAS_norm2one(wv)
 	wave wv
 	duplicate/o wv $(nameofwave(wv)+"_n")
@@ -663,36 +775,45 @@ Function/wave XAS_norm2one(wv)
 	return wv_n
 End
 
+
 Function/wave LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x)
+	///fits a line over the range specified by bkg_xA, bkg_xB 
+	///range_xA, range_XB are the 
 	variable range_xA,range_xB,bkg_xA, bkg_xB
 	wave wv,wv_x
-	variable pA,pB, a,b,brkpnt_y
-	pA=x2pnt(wv,bkg_xA)
-	pB=x2pnt(wv,bkg_xB)
-	string w_coef
+	
+	variable pA,pB, a,b,brkpnt_y,prA,prB
+	findlevel/q wv_x, bkg_xA;pA=round(v_levelX)
+	findlevel/q wv_x, bkg_xB;pB=round(v_levelX)
+
 	//Fitting a line
-	CurveFit/q/NTHR=0 line  wv[pA,pB] /X=wv_x /D 
+	string w_coef
+	CurveFit/q/NTHR=0 line  wv[pA,pB] /X=wv_x[pA,pB]/D 
 	wave fit_wv=$(GetWavesDataFolder(wv,1)+"fit_"+GetWavesDataFolder(wv,4))
 	w_coef= StringByKey("W_coef",note(fit_wv),"=","\r")
 	a=str2num(stringfromlist(0,w_coef[2,strlen(w_coef)-2],","))
 	b=str2num(stringfromlist(1,w_coef[2,strlen(w_coef)-2],","))
+	
 	//Doing subtraction
 	duplicate/o wv $(GetWavesDataFolder(wv,2)+"_bkg")
 	wave wv_bkg=$(GetWavesDataFolder(wv,2)+"_bkg")
-	//wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-(a+b*wv_x[p])+101.832//-wv[x2pnt(wv,range_xA)]
-	//print a,b,wv[x2pnt(wv,range_xA)], b*wv_x[x2pnt(wv,range_xA)]
-	wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-b*wv_x[p]//+(a+wv[x2pnt(wv,range_xA)])
-	wv_bkg[x2pnt(wv,range_xA),x2pnt(wv,range_xB)]=wv[p]-b*wv_x[p]+b*wv_x[x2pnt(wv,range_xA)]//+(a+wv[x2pnt(wv,range_xA)])
-	//Comments	
+	findlevel/q wv_x, range_xA; prA=round(v_levelX)
+	findlevel/q wv_x, range_xB; prB=round(v_levelX)
+	wv_bkg[prA,prB]=wv[p]-b*wv_x[p]+b*wv_x[prA]//wv[p]-(a+b*wv_x[p])+(a+b*wv_x[prB])
+
+	//Add comments to wave note	
 	String BkgSub=StringByKey("\rBkgSub",note(wv),":",";") 
+	string nt=note(wv)
 	if(strlen(BkgSub)==0)
-		//Note wv_bkg, "BkgSub: "+num2str(a)+"; "+num2str(b)
+		Note wv_bkg, "BkgSub: "+num2str(a)+"; "+num2str(b)
 	else
-		//nt=Replacestringbykey("BkgSub:",nt,num2str(a)+"; "+num2str(b),":","\r")
-		//Note/k wv_bkg, nt
+		nt=Replacestringbykey("BkgSub:",nt,num2str(a)+"; "+num2str(b),":","\r")
+		Note/k wv_bkg, nt
 	endif
+	
 	return wv_bkg
 End
+
 
 Function LinearBackgroundSubtract_Dialog()
 	string range, bkg
