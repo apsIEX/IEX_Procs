@@ -1881,7 +1881,7 @@ Function/s LoadNetCDF(df)
 
 	else
 		variable/g   fileID_temp	
-		Execute "NC_openfile/PATH=LoadPathp  fileID_temp as "+filename
+		Execute "NC_openfile/PATH=LoadPath  fileID_temp as \""+filename+"\""
 		Execute "NC_LoadData/All fileID_temp"
 		Execute "NC_closefile fileID_temp"
 	endif
@@ -1891,22 +1891,13 @@ Function/s LoadNetCDF(df)
 	killdatafolder $(df+"nc_load")
 	/////////////  ----- flipping image if the camera is upsidedown ----- //////////////////
 	variable flipping=0 //set 1 for a camera upsidedown otherwise set to 0
-	if(flipping==1)
-		wave nc_array_data
-		duplicate nc_array_data nc_array_flipped
-		wave  nc_array_flipped
-		nc_array_flipped[][][] = nc_array_data[dimsize(nc_array_data,0)-1-p][dimsize(nc_array_data,1)-1-q][r]
-		variable Edim=1, offset_np=100
-		//adding buffer to not account for center being different
-		DeletePoints/M=(Edim) dimsize(nc_array_flipped,Edim)-1-offset_np,offset_np, nc_array_flipped
-		InsertPoints/M=(Edim) 0,100, nc_array_flipped
-		//cleaning up
-		nc_array_data=nc_array_flipped
-		killwaves nc_array_flipped
+	if (v<8)
+		NetCDFmetadata()
+		NetCDF_SESscaling()
+	else
+		NetCDFmetadata_v8()
+		NetCDF_SESscaling_v8()
 	endif
-	
-	NetCDFmetadata()
-	NetCDF_SESscaling()
 	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4]+"avgy",filename[0,strlen(filename)-4])
 	wave wv=$wvname
 	NetCDF_SES_CropImage(wv)
@@ -1993,7 +1984,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	variable DegPerChannel=.0292717// from SES file should be 0.0678/0.1631*EperChannel//
 //	print DegPerChannel
 	If(LensMode>-1) //Sets angular scale unless transmission then leaves pixel JM was here
-		variable CenterChannel=571
+		variable CenterChannel=571-50
 		variable FirstChannel
 		If(waveExists(nc_Attr_FirstChannel))
 			FirstChannel=nc_Attr_FirstChannel[0]
@@ -2024,10 +2015,135 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 	JLM_FileLoaderModule#killallinfolder(dfn)
 	killdatafolder dfn
 end
+Function NetCDFmetadata_v8()
+	string df=getdatafolder(1)
+	DFREF dfr = GetDataFolderDFR()
+	wave array_data //datafile
+	
+	string wvlist=WaveList("Attr_*", ";","")
+	variable i
+	
+ 	string key, val, nt
+ 	nt=""
+	For(i=0;i<itemsinlist(wvlist,";");i+=1)
+  		key=stringfromlist(i,wvlist,";")
+ 		wave wv=$(key)
+ 		if(WaveType(wv,1)==2)
+ 			wave/t wvt=$(key)
+ 			val=cleanupname(wvt[0],1)
+ 		else
+ 			val=cleanupname(num2str(wv[0]),1)
+ 		endif
+ 		note array_data, key+":"+val+";"
+ 	endfor
+end
+Function NetCDF_SESscaling_v8()//Set up for SES  at IEX SerialNumber:4MS276 as of 4/19/2017
+	string dfn=getdatafolder(0)
+	wave nc_Attr_DetectorMode=Attr_DetectorMode
+	wave nc_Attr_AcquisitionMode=Attr_AcquisitionMode
+	wave nc_Attr_LensMode=Attr_LensMode
+	wave nc_Attr_LowEnergy=Attr_LowEnergy
+	wave nc_Attr_HighEnergy=Attr_HighEnergy
+	wave nc_Attr_ActualPhotonEnergy=Attr_ActualPhotonEnergy
+	wave nc_Attr_EnergyStep  = Attr_EnergyStep
+	wave nc_Attr_EnergyStep_RBV = Attr_EnergyStep_RBV
+	wave nc_Attr_EnergyStep_Fixed_RBV = Attr_EnergyStep_Fixed_RBV
+	wave nc_Attr_EnergyStep_Swept = Attr_EnergyStep_Swept
+	wave nc_Attr_EnergyStep_Swept_RBV = Attr_EnergyStep_Swept_RBV
+
+	wave nc_Attr_PassEnergy=Attr_PassEnergy
+	wave nc_Attr_FirstChannel=Attr_FirstChannel
+	wave nc_Attr_CentreEnergy_RBV=Attr_CentreEnergy_RBV
+	wave nc_array_data=array_data
+	
+	variable dimangle = dimsize(nc_array_data,1)
+	variable dimenergy = dimsize(nc_array_data,2)
+	
+	string nt=Note(nc_array_data)
+	make/o/n=(dimenergy,dimangle) $("root:"+dfn)
+	wave wv=$("root:"+dfn)
+	wv=nc_array_data[0][q][p]
+	Note wv nt
+	
+	setdatafolder root:
+	//Energy Scaling Info
+	variable DetMode=nc_Attr_DetectorMode[0] // BE=0,KE=1
+	variable AcqMode= nc_Attr_AcquisitionMode[0]
+	variable LensMode=nc_Attr_LensMode[0]
+	variable Estart, Estop, Edelta, Ehv,Ecenter
+	string Eunits
+	variable PassEnergyMode=nc_Attr_PassEnergy[0]
+	string PElist="1;2;5;10;20;50;100;200;500"
+	variable PE=str2num(stringfromlist(PassEnergyMode,PElist,";"))
+	variable EperChannel=nc_Attr_EnergyStep_Fixed_RBV[0]
+	
+	string df="root:LoaderPanel:"
+	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_AvgImg=$(df+"checkbox_AvgImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
+	
+	if(waveExists(nc_Attr_EnergyStep_Swept))
+		Edelta=selectnumber(DetMode,-nc_Attr_EnergyStep_Swept[0],nc_Attr_EnergyStep_Swept[0])
+	else
+		Edelta=selectnumber(DetMode,-nc_Attr_EnergyStep[0],nc_Attr_EnergyStep[0])
+	endif
+	Switch(AcqMode)
+		case 0: //Swept
+			Ehv=nc_Attr_ActualPhotonEnergy[0]
+			Estart=selectnumber(DetMode,Ehv-nc_Attr_LowEnergy[0],nc_Attr_LowEnergy[0])
+			Estop=selectnumber(DetMode,Ehv-nc_Attr_HighEnergy[0],nc_Attr_HighEnergy[0])
+			Eunits=selectstring(DetMode,"Binding Energy (eV)","Kinetic Energy (eV)")
+		break
+		case 1: //Fixed
+			Eunits=selectstring(DetMode,"Binding Energy (eV)","Kinetic Energy (eV)")
+			Ecenter=nc_Attr_CentreEnergy_RBV[0] 
+			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
+		break
+		case 2://Baby Swept
+			Edelta=selectnumber(DetMode,-nc_Attr_EnergyStep_Fixed_RBV[0],nc_Attr_EnergyStep_Fixed_RBV[0])
+			Eunits=selectstring(DetMode,"Binding Energy (eV)","Kinetic Energy (eV)")
+			Ecenter=nc_Attr_CentreEnergy_RBV[0] 
+			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
+		break
+	endswitch
+	SetScale/p x, Estart,Edelta,Eunits,wv
+	
+	//Angular Scaling Info
+	variable DegPerChannel=.0292717// from SES file should be 0.0678/0.1631*EperChannel//
+//	print DegPerChannel
+	If(LensMode>-1) //Sets angular scale unless transmission then leaves pixel JM was here
+		variable CenterChannel=571-50
+		variable FirstChannel
+		If(waveExists(nc_Attr_FirstChannel))
+			FirstChannel=nc_Attr_FirstChannel[0]
+		else
+			FirstChannel=0
+		endif
+		SetScale/p y, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv
+	EndIf
+	If(dimsize(wv,2)==1)
+		Redimension/N=(-1,-1,0) wv
+	endif
+	//Checkbox transformations
+	print checkbox_AvgImg,checkbox_SweptImg,AcqMode
+	if (checkbox_AvgImg==1 || (checkbox_SweptImg==1 && AcqMode==0))//checks if boxes are check
+		string opt="/X/D=root:"+dfn+"avgy"
+		JLM_FileLoaderModule#ImgAvg(wv,opt)
+		wave avg=$("root:"+dfn+"avgy")
+		note avg Note(wv)
+		killwaves wv
+		wave wv=$("root:"+dfn+"avgy")
+	endif
+	If(check_Transpose==1 && checkbox_AvgImg*checkbox_SweptImg==0)//rotate image (KE vs deg)
+		matrixtranspose wv
+		//SetScale/p y, Estart,Edelta,Eunits,wv//JM
+		//SetScale/p x, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv //JM
+	EndIf
+	JLM_FileLoaderModule#killallinfolder(dfn)
+	killdatafolder dfn
+end
 Function NetCDF_SES_CropImage(wv)
 	wave wv
 		if(dimsize(wv,0)==1000)
-		variable p1=338,p2=819 // data exists between p1 and p2
+		variable p1=338-50,p2=819-50 // data exists between p1 and p2
 		deletepoints/m=0 p2,dimsize(wv,0), wv //right side
 		deletepoints/m=0 0,p1, wv //left side
 		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
