@@ -135,7 +135,7 @@ Function Histogram_img2D(npx, npy, img_v, img_vx, img_vy) //make and image
 	endfor
 	img_hist/=img_norm
 end
-Function VectorCrossProduct(a,b)
+Function/wave VectorCrossProduct(a,b)
 	Wave a, b
 	if (dimsize(a,0)==3&&dimsize(b,0)==3&&wavedims(a)==1&&wavedims(b)==1)
 		make/n=3/o tempc
@@ -731,7 +731,7 @@ Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_T
 	if(DoPreEdge ==1)
 		range_xA=hv[0]
 		range_xB=hv[dimsize(hv,0)]
-		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,preEdge_xA, preEdge_xB, XAS,hv)
+		wave XAS_bkg=LinearBackgroundSubtract(preEdge_xA, preEdge_xB, XAS,hv,range_xA,range_xB)
 		duplicate/o XAS_bkg XAS
 		//adding/updating wavenotes
 		String preEdge=StringByKey("\rXAS_preEdge",note(XAS),":",";") 
@@ -741,10 +741,10 @@ Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_T
 			nt=Replacestringbykey("XAS_preEdge",nt,num2str(a)+"; "+num2str(b),":","\r")
 			Note/k XAS, nt
 		endif
-		variable pA,pB
-		findlevel/q hv, preEdge_xA;pA=round(v_levelX)
-		findlevel/q hv, preEdge_xB;pB=round(v_levelX)
-		wavestats/q/r=(pA,pB) XAS
+		variable xA,xB
+		findlevel/q hv, preEdge_xA;xA=round(v_levelX)
+		findlevel/q hv, preEdge_xB;xB=round(v_levelX)
+		wavestats/q/r=(xA,xB) XAS
 		//print v_avg
 		XAS=XAS-v_avg
 	endif
@@ -753,7 +753,7 @@ Function XAS_Normalization(preEdge_xA, preEdge_xB, postEdge_xA, postEdge_xB,wv_T
 	if(DoPostEdge ==1)
 		range_xA=Edge_x
 		range_xB=hv[dimsize(hv,0)]
-		wave XAS_bkg=LinearBackgroundSubtract(range_xA,range_xB,postEdge_xA, min(range_xB,postEdge_xB), XAS,hv)
+		wave XAS_bkg=LinearBackgroundSubtract(postEdge_xA, min(range_xB,postEdge_xB), XAS,hv,range_xA,range_xB)
 		duplicate/o XAS_bkg XAS
 		//adding/updating wavenotes
 		String postEdge=StringByKey("\rXAS_postEdge",note(XAS),":",";") 
@@ -776,19 +776,22 @@ Function/wave XAS_norm2one(wv)
 End
 
 
-Function/wave LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x)
-	///fits a line over the range specified by bkg_xA, bkg_xB 
-	///range_xA, range_XB are the 
-	variable range_xA,range_xB,bkg_xA, bkg_xB
+Function/wave LinearBackgroundSubtract(bkg_xA, bkg_xB, wv,wv_x,xA,xB)
+	///fits a line over the range specified by xA, xB 
+	///range_xA, range_XB define the range over which to do the subtraction 
+	variable xA,xB,bkg_xA, bkg_xB
 	wave wv,wv_x
 	
-	variable pA,pB, a,b,brkpnt_y,prA,prB
-	findlevel/q wv_x, bkg_xA;pA=round(v_levelX)
-	findlevel/q wv_x, bkg_xB;pB=round(v_levelX)
-
-	//Fitting a line
+	//converting x to p
+	variable pA,pB, a,b,brkpnt_y,bkg_pA,bkg_pB
+	findlevel/q wv_x, xA;pA=x2pnt(wv_x,v_levelX)
+	findlevel/q wv_x, xB;pB=x2pnt(wv_x,v_levelX)
+	findlevel/q wv_x, bkg_xA; bkg_pA=x2pnt(wv_x,v_levelX)
+	findlevel/q wv_x, bkg_xB; bkg_pB=x2pnt(wv_x,v_levelX)
+	
+	//Fitting a line (bkg)
 	string w_coef
-	CurveFit/q/NTHR=0 line  wv[pA,pB] /X=wv_x[pA,pB]/D 
+	CurveFit/q/NTHR=0 line  wv[bkg_pA,bkg_pB] /X=wv_x[bkg_pA,bkg_pB]/D 
 	wave fit_wv=$(GetWavesDataFolder(wv,1)+"fit_"+GetWavesDataFolder(wv,4))
 	w_coef= StringByKey("W_coef",note(fit_wv),"=","\r")
 	a=str2num(stringfromlist(0,w_coef[2,strlen(w_coef)-2],","))
@@ -797,9 +800,7 @@ Function/wave LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x
 	//Doing subtraction
 	duplicate/o wv $(GetWavesDataFolder(wv,2)+"_bkg")
 	wave wv_bkg=$(GetWavesDataFolder(wv,2)+"_bkg")
-	findlevel/q wv_x, range_xA; prA=round(v_levelX)
-	findlevel/q wv_x, range_xB; prB=round(v_levelX)
-	wv_bkg[prA,prB]=wv[p]-b*wv_x[p]+b*wv_x[prA]//wv[p]-(a+b*wv_x[p])+(a+b*wv_x[prB])
+	wv_bkg[pA,pB]=wv[p]-(a+b*wv_x[p])+(a+b*wv_x[pA])
 
 	//Add comments to wave note	
 	String BkgSub=StringByKey("\rBkgSub",note(wv),":",";") 
@@ -832,7 +833,7 @@ Function LinearBackgroundSubtract_Dialog()
 		variable range_xB=str2num(stringfromlist(1,range,","))
 		variable bkg_xA=str2num(stringfromlist(0,bkg,","))
 		variable bkg_xB=str2num(stringfromlist(1,bkg,","))
-		LinearBackgroundSubtract(range_xA,range_xB,bkg_xA, bkg_xB, wv,wv_x)
+		LinearBackgroundSubtract(bkg_xA, bkg_xB, wv,wv_x,range_xA,range_xB)
 	endif
 End
 

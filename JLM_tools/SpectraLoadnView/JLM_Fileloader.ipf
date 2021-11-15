@@ -52,7 +52,7 @@ function LoaderPanelVariables()
 	filelist="Select;"
 	folderList="Select;"
 	LPext="*.mda"///change default here
-	datatypelist="MDA;Igor Binary;General Text;Spec;MDAascii;Tiff;NetCDF;MPA" ///edit to include other data types
+	datatypelist="MDA;Igor Binary;General Text;Spec;MDAascii;Tiff;NetCDF;h5;MPA" ///edit to include other data types
 	datatype="MDA" ////change default time here
 	wvdf="root:"
 	checkBE_KE=0
@@ -302,6 +302,16 @@ Function LoaderDataTypePopupMenuAction (ctrlName,popNum,popStr) : PopupMenuContr
 			CheckBox checkbox_SweptImg, disable=0
 			CheckBox check_Transpose, disable=0
 		break
+		case "h5":
+			LPext="*.h5"
+			Button LoadButton title="Load",  disable=0
+			Button LoadAllButton title="Load All", disable=1
+			Button TiffAllButton, disable =1
+			CheckBox checkbox_KE_BE, disable=0
+			CheckBox checkbox_AvgImg, disable=0
+			CheckBox checkbox_SweptImg, disable=0
+			CheckBox check_Transpose, disable=0
+		break		
 		case "MPA":
 			LPext="*.mpa"
 			Button LoadButton title="Load",  disable=0
@@ -379,6 +389,8 @@ Function LoaderDataFolderExt(df) //preselect data type based on folder names
 		datatype="MDA"
 	elseif(stringmatch(filepath,"*netCDF*")==1)
 		datatype="NetCDF"
+	elseif(stringmatch(filepath,"*h5*")==1)
+		datatype="h5"
 	elseif(stringmatch(filepath,"*tif*")==1)
 		datatype="Tiff"
 	elseif(stringmatch(filepath,"*SES*")==1)
@@ -576,6 +588,10 @@ Function/S LoaderLoadFile(df, ctrlName)
 		case "NetCDF":
 			svar filename=$(df+"filename"), filepath=$(df+"filepath")
 			LoadNetCDF(df)
+		break
+		case "h5":
+			svar filename=$(df+"filename"), filepath=$(df+"filepath")
+			LoadH5(df)
 		break
 		case "MPA":
 			svar filename=$(df+"filename"), filepath=$(df+"filepath")
@@ -2149,6 +2165,163 @@ Function NetCDF_SES_CropImage(wv)
 		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
 	endif
 end
+///////////////////////h5/////////////////////////////////
+Function LoadH5(df)
+	string df
+	svar filelist=$(df+"filelist"), filename=$(df+"filename"), filepath=$(df+"filepath")	
+	killdatafolder/z $(df+"h5_load")
+	newdatafolder $(df+"h5_load")
+	setdatafolder $(df+"h5_load")
+	
+	variable/g   fileID_temp	
+	variable result=0
+	
+	HDF5OpenFile /P=LoadPath /R /Z fileID_temp as filename
+	if (V_flag != 0)
+		Print "HDF5OpenFile failed"
+		return -1
+	endif
+	HDF5LoadData /O /Z fileID_temp, "/entry/instrument/detector/data"
+	
+	duplicatedatafolder $(df+"h5_load") $("root:"+filename[0,strlen(filename)-4])
+	setdatafolder $("root:"+filename[0,strlen(filename)-4])
+	killdatafolder $(df+"h5_load")
+	
+	h5metadata()
+	h5_SESscaling()
+
+	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4]+"avgy",filename[0,strlen(filename)-4])
+	wave wv=$wvname
+	h5_SES_CropImage(wv)
+	nvar checkBE_KE=$(df+"checkBE_KE")
+	if (checkBE_KE==1)
+		variable wk=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_Energy Offset",":",";") 
+		IEX_SetEnergyScale(wvname,0,wavedims(wv)-1,wk)
+	endif
+	//return filename[0,strlen(filename)-4]
+End
+
+Function h5metadata()
+	nvar fileID_temp
+	string df=getdatafolder(1)
+	wave data //datafile
+	
+	HDF5ListGroup /R=2/Type=2/Z fileID_temp,"/entry/instrument/NDAttributes/"
+	string metaData=S_HDF5ListGroup
+
+ 	string key, val, nt
+ 	variable i
+	For(i=0;i<itemsinlist(metaData,";");i+=1)
+  		key=stringfromlist(i,metaData)
+  		HDF5LoadData /O fileID_temp, "/entry/instrument/NDAttributes/"+key
+ 		wave wv=$stringfromlist(0,S_waveNames,";")
+ 		if(WaveType(wv,1)==2)
+ 			wave/t wvt=$stringfromlist(0,S_waveNames,";")
+ 			val=cleanupname(wvt[0],1)
+ 		else
+ 			val=cleanupname(num2str(wv[0]),1)
+ 		endif
+ 		note data, key+":"+val+";"
+ 	endfor
+ 	HDF5CloseFile fileID_temp
+end
+
+Function h5_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 6/14/2021
+	string dfn=getdatafolder(0)
+	wave SpectraMode, LensMode
+	wave sweepStartEnergy, sweepStopEnergy,sweepStepEnergy
+	wave fixedEnergy, babySweepStepSize, babySweepCenter
+	wave ActualPhotonEnergy 
+	wave PassEnergy
+	wave data
+	
+	duplicate/o data $("root:"+dfn)
+	wave wv=$("root:"+dfn)
+	matrixtranspose wv
+	print dimsize(data,0)
+	print dimsize(wv,0)
+	
+	setdatafolder root:
+	//Energy Scaling Info
+
+	variable Spectra_Mode= SpectraMode[0]
+	variable Lens_Mode=LensMode[0]
+	variable Estart, Estop, Edelta, Ehv, Ecenter
+	string Eunits="Kinetic Energy (eV)"
+	variable PE=PassEnergy[0]
+	variable EperChannel=babySweepStepSize[0]
+	
+	string df="root:LoaderPanel:"
+	nvar checkBE_KE=$(df+"checkBE_KE"),checkbox_AvgImg=$(df+"checkbox_AvgImg"),checkbox_SweptImg=$(df+"checkbox_SweptImg"),check_Transpose=$(df+"check_Transpose")
+	
+	if(Spectra_Mode >1)//swept
+		Edelta=sweepStepEnergy[0]
+	else
+		Edelta=babySweepStepSize[0]
+	endif
+	Switch(Spectra_Mode)
+		case 2: //Swept
+			Ehv=ActualPhotonEnergy[0]
+			Estart=sweepStartEnergy[0]
+			Estop=sweepStopEnergy[0]
+			
+		break
+		case 0: //Fixed
+			Ecenter=fixedEnergy[0]
+			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
+		break
+		case 1://Baby-Swept
+
+			Ecenter=babySweepCenter[0]
+			Estart=Ecenter-(dimsize(wv,0)/2)*Edelta//not transposed yet
+		break
+	endswitch
+	SetScale/p x, Estart,Edelta,Eunits,wv
+	
+	//Angular Scaling Info
+	variable DegPerChannel=.0292717// from SES file should be 0.0678/0.1631*EperChannel//
+//	print DegPerChannel
+	If(Lens_Mode>-1) //Sets angular scale unless transmission then leaves pixel JM was here
+		variable CenterChannel=571-50
+		variable FirstChannel=0
+		SetScale/p y, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv
+	EndIf
+	If(dimsize(wv,2)==1)
+		Redimension/N=(-1,-1,0) wv
+	endif
+	//Checkbox transformations
+	print checkbox_AvgImg,checkbox_SweptImg
+	if (checkbox_AvgImg==1 || (checkbox_SweptImg==1))//checks if boxes are check
+		string opt="/X/D=root:"+dfn+"avgy"
+		JLM_FileLoaderModule#ImgAvg(wv,opt)
+		wave avg=$("root:"+dfn+"avgy")
+		//note avg Note(wv)
+		//killwaves wv
+		//wave wv=$("root:"+dfn+"avgy")
+	endif
+	If(check_Transpose==1 && checkbox_AvgImg*checkbox_SweptImg==0)//rotate image (KE vs deg)
+		Redimension/S/N=(dimsize(data,1),dimsize(data,0),-1,-1) wv
+		wv[][][][]=data[q][p][r][x]	
+		SetScale/p y, Estart,Edelta,Eunits,wv//JM
+		SetScale/p x, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv //JM
+	EndIf
+	
+	JLM_FileLoaderModule#killallinfolder(dfn)
+	killdatafolder dfn
+end
+
+
+Function h5_SES_CropImage(wv)
+	wave wv
+	//if(dimsize(wv,0)==1000)
+		variable p1=338-25,p2=819-25 // data exists between p1 and p2
+		deletepoints/m=1 p2,dimsize(wv,0), wv //right side
+		deletepoints/m=1 0,p1, wv //left side
+		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
+	//endif
+end
+
+
 Menu "APS Procs"
 	Submenu "IEX"
 		Submenu "ARPES - Analysis Tools"		
