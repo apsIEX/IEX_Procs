@@ -4,19 +4,10 @@
 
 // $Description: Loader for files found at IEX Beamline  (Sector 29 at the APS) 
 // $Author: JLM$
-// SVN History: $Revision: 3 $ on $Date:May 11, 2020 $
+// SVN History: $Revision: Igor_git $ on $Date:Dec 15, 2022 $
 
 /// Developement for the IEX Beamline (Sector 29 at the APS) June 2011
-///	v1.01	Added an MDAascii load 11/25/2013
-///v2.00 Cleaned up and added MDAascii C-code conveter
-	///v2.02 	Uses User Procedures in Documents
-	//			Fixed tif (convert to float)
-	//			Filenames can start with number
-	///v2.03 Added MPA file to loader
-	///v2.04 Fixed LoaderPanel renaming bug added help functions
-	//20170817 loading arpes data cropped added dither
-	// v2.06 Cleaned up procedure to make easier to share - implemented static functions
-	//v3.00 Mda loader works on window, procedure uses static functions to a standalone
+
 
 Menu "Data"
 		"IEX LoaderPanel", Loader_Panel()
@@ -109,7 +100,7 @@ Function LoaderPanelSetup()
 	CheckBox checkbox_SweptImg title="Avg Swept",pos={275,105}, size={95,15},variable=root:LoaderPanel:checkbox_SweptImg,disable=0
 	CheckBox checkbox_SweptImg, help={"UnCheck to load swept data as image"}
 	
-	CheckBox check_Transpose title="E vs K",pos={220,105}, size={95,15}, value=1,variable=root:LoaderPanel:check_Transpose,disable=0
+	CheckBox check_Transpose title="E vs K",pos={220,105}, size={95,15}, value=0,variable=root:LoaderPanel:check_Transpose,disable=0
 	CheckBox check_Transpose, help={"UnCheck to load energy as x-axis"}
 end
 
@@ -884,7 +875,7 @@ Function MDA2ascii(filepath,filename,SpectraLoadNViewpath) //covert mda to ascii
 			mda=replacestring(" ", mda, "\\\ ")
 			sprintf cmd, "do shell script \"%s %s %s\"", exe, ascii, mda
 		break
-		endswitch
+		endswitch	
 		ExecuteScriptText cmd	
 end
 Function/S MDAmkascii(SpectraLoadNViewpath)
@@ -1893,7 +1884,11 @@ Function/s LoadNetCDF(df)
 	setdatafolder $(df+"nc_load")
 	variable v=IgorVersion()
 	if (v<8)
-		Execute "Load_NetCDF/P=LoadPath/T/Q "+df+"filename"
+		if (cmpstr(stringByKey("IGORKIND", IgorInfo(0)),"pro64")==0)
+			print "Igor 7 does not have a 64 bit nc loader"
+		else
+			Execute "Load_NetCDF/P=LoadPath/T/Q "+df+"filename"
+		endif
 
 	else
 		variable/g   fileID_temp	
@@ -1916,7 +1911,9 @@ Function/s LoadNetCDF(df)
 	endif
 	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4]+"avgy",filename[0,strlen(filename)-4])
 	wave wv=$wvname
+	
 	NetCDF_SES_CropImage(wv)
+	
 	nvar checkBE_KE=$(df+"checkBE_KE")
 	if (checkBE_KE==1)
 		variable wk=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_Energy Offset",":",";") 
@@ -2013,7 +2010,7 @@ Function NetCDF_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 4
 		Redimension/N=(-1,-1,0) wv
 	endif
 	//Checkbox transformations
-	print checkbox_AvgImg,checkbox_SweptImg,AcqMode
+	//print checkbox_AvgImg,checkbox_SweptImg,AcqMode
 	if (checkbox_AvgImg==1 || (checkbox_SweptImg==1 && AcqMode==0))//checks if boxes are check
 		string opt="/X/D=root:"+dfn+"avgy"
 		JLM_FileLoaderModule#ImgAvg(wv,opt)
@@ -2076,11 +2073,20 @@ Function NetCDF_SESscaling_v8()//Set up for SES  at IEX SerialNumber:4MS276 as o
 	variable dimenergy = dimsize(nc_array_data,2)
 	
 	string nt=Note(nc_array_data)
-	make/o/n=(dimenergy,dimangle) $("root:"+dfn)
-	wave wv=$("root:"+dfn)
-	wv=nc_array_data[0][q][p]
+	variable v=IgorVersion()
+	if(v == 8)
+		make/o/n=(dimenergy,dimangle) $("root:"+dfn)
+		wave wv=$("root:"+dfn)
+		wv=nc_array_data[0][p][q] //works in v8
+	else
+		duplicate/o nc_array_data $("root:"+dfn)
+		wave wv=$("root:"+dfn)
+		Redimension/N=(dimenergy*dimangle) wv
+		Redimension/N=(dimenergy,dimangle) wv
+	endif
+
 	Note wv nt
-	
+
 	setdatafolder root:
 	//Energy Scaling Info
 	variable DetMode=nc_Attr_DetectorMode[0] // BE=0,KE=1
@@ -2126,7 +2132,7 @@ Function NetCDF_SESscaling_v8()//Set up for SES  at IEX SerialNumber:4MS276 as o
 	variable DegPerChannel=.0292717// from SES file should be 0.0678/0.1631*EperChannel//
 //	print DegPerChannel
 	If(LensMode>-1) //Sets angular scale unless transmission then leaves pixel JM was here
-		variable CenterChannel=571-50
+		variable CenterChannel=571+50
 		variable FirstChannel
 		If(waveExists(nc_Attr_FirstChannel))
 			FirstChannel=nc_Attr_FirstChannel[0]
@@ -2139,7 +2145,7 @@ Function NetCDF_SESscaling_v8()//Set up for SES  at IEX SerialNumber:4MS276 as o
 		Redimension/N=(-1,-1,0) wv
 	endif
 	//Checkbox transformations
-	print checkbox_AvgImg,checkbox_SweptImg,AcqMode
+	//print checkbox_AvgImg,checkbox_SweptImg,AcqMode
 	if (checkbox_AvgImg==1 || (checkbox_SweptImg==1 && AcqMode==0))//checks if boxes are check
 		string opt="/X/D=root:"+dfn+"avgy"
 		JLM_FileLoaderModule#ImgAvg(wv,opt)
@@ -2155,13 +2161,17 @@ Function NetCDF_SESscaling_v8()//Set up for SES  at IEX SerialNumber:4MS276 as o
 	EndIf
 	JLM_FileLoaderModule#killallinfolder(dfn)
 	killdatafolder dfn
-end
+endS
 Function NetCDF_SES_CropImage(wv)
 	wave wv
-		if(dimsize(wv,0)==1000)
-		variable p1=338-50,p2=819-50 // data exists between p1 and p2
+	variable p1=338+5,p2=819+5 // data exists between p1 and p2
+	if(dimsize(wv,0)==1000)
 		deletepoints/m=0 p2,dimsize(wv,0), wv //right side
 		deletepoints/m=0 0,p1, wv //left side
+		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
+	elseif(dimsize(wv,1)==1000)
+		deletepoints/m=1 p2,dimsize(wv,0), wv //right side
+		deletepoints/m=1 0,p1, wv //left side
 		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
 	endif
 end
@@ -2176,12 +2186,12 @@ Function LoadH5(df)
 	variable/g   fileID_temp	
 	variable result=0
 	
-	HDF5OpenFile /P=LoadPath /R /Z fileID_temp as filename
+	HDF5OpenFile/Q /P=LoadPath /R /Z fileID_temp as filename
 	if (V_flag != 0)
 		Print "HDF5OpenFile failed"
 		return -1
 	endif
-	HDF5LoadData /O /Z fileID_temp, "/entry/instrument/detector/data"
+	HDF5LoadData/Q /O /Z fileID_temp, "/entry/instrument/detector/data"
 	
 	duplicatedatafolder $(df+"h5_load") $("root:"+filename[0,strlen(filename)-4])
 	setdatafolder $("root:"+filename[0,strlen(filename)-4])
@@ -2192,7 +2202,6 @@ Function LoadH5(df)
 
 	string wvname=SelectString(exists(filename[0,strlen(filename)-4]),filename[0,strlen(filename)-4]+"avgy",filename[0,strlen(filename)-4])
 	wave wv=$wvname
-	h5_SES_CropImage(wv)
 	nvar checkBE_KE=$(df+"checkBE_KE")
 	if (checkBE_KE==1)
 		variable wk=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"Attr_Energy Offset",":",";") 
@@ -2213,7 +2222,7 @@ Function h5metadata()
  	variable i
 	For(i=0;i<itemsinlist(metaData,";");i+=1)
   		key=stringfromlist(i,metaData)
-  		HDF5LoadData /O fileID_temp, "/entry/instrument/NDAttributes/"+key
+  		HDF5LoadData/Q /O fileID_temp, "/entry/instrument/NDAttributes/"+key
  		wave wv=$stringfromlist(0,S_waveNames,";")
  		if(WaveType(wv,1)==2)
  			wave/t wvt=$stringfromlist(0,S_waveNames,";")
@@ -2238,8 +2247,6 @@ Function h5_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 6/14/
 	duplicate/o data $("root:"+dfn)
 	wave wv=$("root:"+dfn)
 	matrixtranspose wv
-	print dimsize(data,0)
-	print dimsize(wv,0)
 	
 	setdatafolder root:
 	//Energy Scaling Info
@@ -2282,7 +2289,7 @@ Function h5_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 6/14/
 	variable DegPerChannel=.0292717// from SES file should be 0.0678/0.1631*EperChannel//
 //	print DegPerChannel
 	If(Lens_Mode>-1) //Sets angular scale unless transmission then leaves pixel JM was here
-		variable CenterChannel=571-50
+		variable CenterChannel=571 //(571-50)/2
 		variable FirstChannel=0
 		SetScale/p y, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv
 	EndIf
@@ -2290,7 +2297,7 @@ Function h5_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 6/14/
 		Redimension/N=(-1,-1,0) wv
 	endif
 	//Checkbox transformations
-	print checkbox_AvgImg,checkbox_SweptImg
+	//print checkbox_AvgImg,checkbox_SweptImg
 	if (checkbox_AvgImg==1 || (checkbox_SweptImg==1))//checks if boxes are check
 		string opt="/X/D=root:"+dfn+"avgy"
 		JLM_FileLoaderModule#ImgAvg(wv,opt)
@@ -2306,19 +2313,28 @@ Function h5_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 6/14/
 		SetScale/p x, (FirstChannel-CenterChannel)*DegPerChannel,DegPerChannel,"Deg",wv //JM
 	EndIf
 	
+	variable AngleDim = 1
+	wave ROI = $("root:"+dfn+":ROI_width")
+	if(waveExists(ROI_height)==0)
+		if (dimsize(wv,AngleDim) != ROI[0])
+			h5_SES_CropImage(wv,AngleDim)
+		endif
+	endif
+	
 	JLM_FileLoaderModule#killallinfolder(dfn)
 	killdatafolder dfn
 end
 
 
-Function h5_SES_CropImage(wv)
+Function h5_SES_CropImage(wv,AngleDim)
 	wave wv
-	//if(dimsize(wv,0)==1000)
-		variable p1=338-25,p2=819-25 // data exists between p1 and p2
-		deletepoints/m=1 p2,dimsize(wv,0), wv //right side
-		deletepoints/m=1 0,p1, wv //left side
-		setscale/p x, dimoffset(wv,0)+p1*dimdelta(wv,0), dimdelta(wv,0),"Angle",wv
-	//endif
+	variable AngleDim
+	variable p1=338-25,p2=819-25  // data exists between p1 and p2
+	variable A1=dimoffset(wv,AngleDim)
+	
+	deletepoints/m=(AngleDim) p2,dimsize(wv,AngleDim), wv //right side
+	deletepoints/m=(AngleDim) 0,p1, wv //left side		
+	setscale/p y, A1+p1*dimdelta(wv,AngleDim), dimdelta(wv,AngleDim),"Angle",wv
 end
 
 
@@ -2335,20 +2351,28 @@ end
 
 Function IEX_SetEnergyScale_Dialog()
 	string wvname,Emodestr,Edimstr="y"
+	string dtype="h5"
 	variable Wk=4.8
+	Prompt dtype, "EA dtype:", popup, "h5; netCDF"
 	Prompt wvname, "Wave:",popup, "; -- 4D --;"+WaveList("!*_CT",";","DIMS:4")+"; -- 3D --;"+WaveList("!*_CT",";","DIMS:3")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:2")+"; -- 2D --;"+WaveList("!*_CT",";","DIMS:1")
 	Prompt Emodestr, "Energy Scale", popup, "Binding Energy; Kinetic Energy"
 	Prompt Edimstr, "Energy Dimension:", popup, "x;y;z;t"
 	Prompt Wk, "Work Function"
-	DoPrompt "Set netCDF SES Energy Scale",wvname,Emodestr,Edimstr,WK
+	DoPrompt "Set EA Energy Scale",dtype,wvname,Emodestr,Edimstr,WK
 	variable Emode,Edim
 	Emode=SelectNumber(cmpstr(Emodestr,"Binding Energy"),0,1)
 	Edim=SelectNumber(cmpstr(Edimstr,"t"),3,1+cmpstr(Edimstr,"y")) //dim from  popup list
 	if (v_flag==0)
-		print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+","+num2str(Wk)+")"	
-		IEX_SetEnergyScale(wvname,Emode,Edim,Wk)
+		if (stringmatch(dtype,"h5"))
+			print "IEX_SetEnergyScale_h5(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+","+num2str(Wk)+")"	
+			IEX_SetEnergyScale_h5(wvname,Emode,Edim,Wk)
+		elseif(stringmatch(dtype,"netCDF"))
+			print "IEX_SetEnergyScale(\""+wvname+"\","+num2str(Emode)+","+num2str(Edim)+","+num2str(Wk)+")"	
+			IEX_SetEnergyScale(wvname,Emode,Edim,Wk)
+		endif
 	endif
 end
+
 Function IEX_SetEnergyScale(wvname,Emode,Edim, Wk)
 	string wvname
 	variable Emode	// BE=0,KE=1
@@ -2366,6 +2390,46 @@ Function IEX_SetEnergyScale(wvname,Emode,Edim, Wk)
 	variable Estart=SelectNumber(AcqMode,SelectNumber(Emode,LowEnergy-hvphi,LowEnergy), SelectNumber(Emode,CentreEnergy-(dimsize($wvname,Edim)/2)*Edelta-hvphi,CentreEnergy-(dimsize($wvname,Edim)/2)*Edelta))
 	string Eunits=SelectString(Emode,"Binding Energy (eV)", "Kinetic Energy (eV)")
 	variable i
+	Switch (Edim)
+		case 0:
+			SetScale/p x, Estart,Edelta,Eunits,$wvname
+			break
+		case 1:
+			SetScale/p y, Estart,Edelta,Eunits,$wvname
+			break
+		case 2:
+			SetScale/p z, Estart,Edelta,Eunits,$wvname
+			break
+		case 3:
+			SetScale/p t, Estart,Edelta,Eunits,$wvname
+			break
+		Endswitch
+end
+
+Function IEX_SetEnergyScale_h5(wvname,Emode,Edim, Wk)
+	string wvname
+	variable Emode	// BE=0,KE=1
+	variable Edim, Wk
+	string  keysep=":",listsep=";"
+	variable hvphi=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"ActualPhotonEnergy",keysep,listsep) 
+	hvphi-=wk//photon energy plus the work function
+	
+	variable Spectra_Mode=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"SpectraMode",keysep,listsep) // Swept=2; Baby-Swept=1; Fixed=0
+
+	variable sweepStartEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"sweepStartEnergy",keysep,listsep) 
+	variable sweepStopEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"sweepStopEnergy",keysep,listsep) 
+	variable sweepStepEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"sweepStepEnergy",keysep,listsep)
+	variable pixelEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"pixelEnergy",keysep,listsep) 	
+	variable fixedEnergy=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"fixedEnergy",keysep,listsep) 	
+	variable babySweepCenter=JLM_FileLoaderModule#WavenoteKeyVal(wvname,"\r"+"babySweepCenter",keysep,listsep) 	
+	variable CentreEnergy=SelectNumber(Spectra_Mode,fixedEnergy,babySweepCenter)
+	 
+
+	variable Edelta=SelectNumber(Spectra_Mode<2,sweepStepEnergy,pixelEnergy) 
+	variable Estart=SelectNumber(Spectra_Mode<2,SelectNumber(Emode,sweepStartEnergy-hvphi,sweepStartEnergy), SelectNumber(Emode,CentreEnergy-(dimsize($wvname,Edim)/2)*Edelta-hvphi,CentreEnergy-(dimsize($wvname,Edim)/2)*Edelta))
+	string Eunits=SelectString(Emode,"Binding Energy (eV)", "Kinetic Energy (eV)")
+	variable i
+	
 	Switch (Edim)
 		case 0:
 			SetScale/p x, Estart,Edelta,Eunits,$wvname

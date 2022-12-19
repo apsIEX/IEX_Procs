@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#DIRNAME=`dirname $0`
+DIRNAME=/APSshare/bin/mda-utils
+#BASENAME=`basename $0`
+BASENAME="mda2ascii-1.4.2"
+
+OS=`/bin/uname -s`
+if [[ "$OS" == "Linux" ]]
+then
+    MACH=`/bin/uname -m`
+    if [[ "$MACH" == "x86_64" ]]
+    then
+        ARCHDIR="linux-x86_64"
+    else
+        ARCHDIR="linux-x86_32"
+    fi
+fi
+
+COMMAND="${DIRNAME}/${ARCHDIR}/${BASENAME}"
+
+## for testing
+#echo "${COMMAND}"
+
+exec ${COMMAND} $@
+

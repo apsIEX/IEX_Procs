@@ -875,7 +875,7 @@ Function ImAvgY_dialog()
 	wave wv
 	string newname
 	string opt="/X/D=root:"+newname+"avgy"
-	ImgAvg(wv,opt)
+	JLM_FileLoaderModule#ImgAvg(wv,opt)
 end
 
 /////////////////////////////////////////////////////////////////////////

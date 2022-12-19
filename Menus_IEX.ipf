@@ -4,8 +4,9 @@
 #include "SpectraLoadnView"
 #include "JLM_tools"
 #include "IEX_tools"
-#include "JLM_ImageTool_Addons"
-
+if exists("NewImageTool5")
+	#include "JLM_ImageTool_Addons"
+endif
 
 Menu "Analysis"
 	Submenu "Packages"

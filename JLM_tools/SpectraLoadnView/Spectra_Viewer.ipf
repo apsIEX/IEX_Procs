@@ -860,7 +860,7 @@ Function SpectraViewerHook(H_Struct)
 	if(eventcode==2)
 		dowindow /F $dfn
 //		RemoveGasCell()
-		killallinfolder(df)
+		JLM_FileLoaderModule#killallinfolder(df)
 		killdatafolder $df
 		return(-1)
 	endif

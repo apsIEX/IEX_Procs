@@ -646,7 +646,7 @@ Function ImgAvg_dialog()
 		string A=selectstring(axis-1,"Y","X")
 		string opt="/"+A+"/D="+GetWavesDataFolder($nameofwave(wv),2)+suffix
 		print "ImgAvg("+nameofwave(wv)+",\""+opt+"\")"
-		ImgAvg(wv,opt)
+		JLM_FileLoaderModule#ImgAvg(wv,opt)
 	endif
 end
 
