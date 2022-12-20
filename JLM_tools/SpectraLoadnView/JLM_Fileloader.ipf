@@ -2161,7 +2161,7 @@ Function NetCDF_SESscaling_v8()//Set up for SES  at IEX SerialNumber:4MS276 as o
 	EndIf
 	JLM_FileLoaderModule#killallinfolder(dfn)
 	killdatafolder dfn
-endS
+end
 Function NetCDF_SES_CropImage(wv)
 	wave wv
 	variable p1=338+5,p2=819+5 // data exists between p1 and p2
