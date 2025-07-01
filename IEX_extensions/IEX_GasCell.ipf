@@ -214,7 +214,7 @@ Function DataPopupMenuAction (ctrlName,popNum,popStr) : PopupMenuControl
 	print "select"
 	execute "PopupMenu popupdata value=\""+wvstr+"\""
 	wave wv=$popstr
-	string wdf=getdatafolder(wv)
+	//string wdf=getdatafolder(wv)
 	appendtograph wv
 	ModifyGraph rgb($popstr)=(0,0,0)
 	duplicate/o wv $(df+"hv")
