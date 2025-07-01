@@ -2214,8 +2214,7 @@ Function h5metadata()
 	nvar fileID_temp
 	string df=getdatafolder(1)
 	wave data //datafile
-	
-	HDF5ListGroup /R=2/Type=2/Z fileID_temp,"/entry/instrument/NDAttributes/"
+	HDF5ListGroup /R=2/Type=2/Z fileID_temp,"/entry/instrument/NDAttributes" 
 	string metaData=S_HDF5ListGroup
 
  	string key, val, nt
@@ -2326,14 +2325,14 @@ Function h5_SESscaling()//Set up for SES  at IEX SerialNumber:4MS276 as of 6/14/
 end
 
 
-Function h5_SES_CropImage(wv,AngleDim)
+Function h5_SES_CropImage(wv,AngleDim) //JM was here
 	wave wv
 	variable AngleDim
 	variable p1=338-25,p2=819-25  // data exists between p1 and p2
 	variable A1=dimoffset(wv,AngleDim)
 	
-	deletepoints/m=(AngleDim) p2,dimsize(wv,AngleDim), wv //right side
-	deletepoints/m=(AngleDim) 0,p1, wv //left side		
+	//deletepoints/m=(AngleDim) p2,dimsize(wv,AngleDim), wv //right side
+	//deletepoints/m=(AngleDim) 0,p1, wv //left side		
 	setscale/p y, A1+p1*dimdelta(wv,AngleDim), dimdelta(wv,AngleDim),"Angle",wv
 end
 
